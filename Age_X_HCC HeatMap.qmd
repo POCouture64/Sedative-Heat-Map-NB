@@ -87,15 +87,18 @@ hcc <- st_read("https://gnb.socrata.com/api/geospatial/sdyn-7de6?method=export&f
 zones <- st_read("https://gnb.socrata.com/api/geospatial/x8mg-22ju?method=export&format=GeoJSON", quiet = TRUE) %>%
   st_make_valid()
 
-# Join your data
 hcc_map <- hcc %>%
   left_join(df_hcc_final, by = c("com" = "HCC"))
 
-# Make zone outlines continuous (fixed geometry)
 zones_union <- st_union(st_make_valid(zones))
 
 # ----------------------------------------------------------
-# PLOTTING FUNCTION (black text + auto arrows)
+# DEFINE HCCs THAT NEED ARROWS
+# ----------------------------------------------------------
+arrow_labels <- c(6, 14.1, 14.3, 22.1)
+
+# ----------------------------------------------------------
+# PLOTTING FUNCTION (Black text + arrows only for certain HCCs)
 # ----------------------------------------------------------
 plot_hcc_final <- function(data, sex_label) {
   dat_sex <- subset(data, Sex == sex_label)
@@ -103,14 +106,26 @@ plot_hcc_final <- function(data, sex_label) {
   centroids <- st_point_on_surface(dat_sex)
   label_points <- cbind(centroids, st_coordinates(centroids$geometry))
   
+  # Split label sets
+  arrow_data <- subset(label_points, com %in% arrow_labels)
+  text_data  <- subset(label_points, !(com %in% arrow_labels))
+  
   ggplot() +
-    # Grey zone outlines
     geom_sf(data = zones_union, fill = NA, color = "grey35", linewidth = 0.8) +
-    # Fill for each HCC
     geom_sf(data = dat_sex, aes(fill = Chronic_Pct), color = "white", linewidth = 0.4) +
-    # Label with optional arrows (only when overlapping)
+    
+    # Normal text labels (inside polygons)
+    geom_text(
+      data = text_data,
+      aes(X, Y, label = paste0(round(Chronic_Pct, 1), "%")),
+      color = "black",
+      size = 4.2,
+      fontface = "bold"
+    ) +
+    
+    # Arrows for small areas
     geom_text_repel(
-      data = label_points,
+      data = arrow_data,
       aes(X, Y, label = paste0(round(Chronic_Pct, 1), "%")),
       color = "black",
       size = 4.2,
@@ -119,28 +134,30 @@ plot_hcc_final <- function(data, sex_label) {
       segment.size = 0.4,
       box.padding = 0.3,
       min.segment.length = 0,
-      force = 2,         # gentle repelling so only crowded ones move
-      max.overlaps = 50, # allows most labels to stay inside
+      force = 4,
       nudge_x = 0,
       nudge_y = 0
     ) +
+    
     scale_fill_gradient(
-      low = "#e6ccff",   # light purple
-      high = "#3f007d",  # dark purple
+      low = "#e6ccff",
+      high = "#3f007d",
       name = "% Chronic Use",
       na.value = "grey90"
     ) +
+    
     labs(
       title = paste("Chronic BZRA Use by Health Council (HCC) –", sex_label),
       subtitle = "Darker = Higher % Chronic Use",
       caption = "Data source: SIMOA + NBHC Health Councils"
     ) +
+    
     theme_void(base_size = 14) +
     theme(
       legend.position = "none",
-      plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
-      plot.subtitle = element_text(size = 12, hjust = 0.5),
-      plot.caption = element_text(size = 10, hjust = 1)
+      plot.title = element_text(size = 18, face = "bold", hjust = 0.5, color = "black"),
+      plot.subtitle = element_text(size = 12, hjust = 0.5, color = "black"),
+      plot.caption = element_text(size = 10, hjust = 1, color = "black")
     )
 }
 
