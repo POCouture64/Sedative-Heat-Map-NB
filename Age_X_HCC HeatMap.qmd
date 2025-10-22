@@ -37,7 +37,7 @@ library(lwgeom)
 # ----------------------------------------------------------
 # SUMMARIZE DATA
 # ----------------------------------------------------------
-# --- Men ---
+# --- Summaries ---
 men_summary <- Age_x_HCC_Sheet %>%
   group_by(M_HCC) %>%
   summarise(
@@ -49,7 +49,6 @@ men_summary <- Age_x_HCC_Sheet %>%
   ) %>%
   rename(HCC = M_HCC)
 
-# --- Women ---
 women_summary <- Age_x_HCC_Sheet %>%
   group_by(W_HCC) %>%
   summarise(
@@ -61,7 +60,6 @@ women_summary <- Age_x_HCC_Sheet %>%
   ) %>%
   rename(HCC = W_HCC)
 
-# --- Combine and total ---
 df_combined <- bind_rows(men_summary, women_summary)
 
 total_summary <- df_combined %>%
@@ -77,9 +75,7 @@ total_summary <- df_combined %>%
 df_hcc_final <- bind_rows(df_combined, total_summary) %>%
   mutate(HCC = as.numeric(as.character(HCC)))
 
-# ----------------------------------------------------------
-# LOAD MAPS
-# ----------------------------------------------------------
+# --- Load map ---
 hcc <- st_read("https://gnb.socrata.com/api/geospatial/sdyn-7de6?method=export&format=GeoJSON", quiet = TRUE) %>%
   st_make_valid() %>%
   mutate(com = as.numeric(com))
@@ -92,14 +88,10 @@ hcc_map <- hcc %>%
 
 zones_union <- st_union(st_make_valid(zones))
 
-# ----------------------------------------------------------
-# DEFINE HCCs THAT NEED ARROWS
-# ----------------------------------------------------------
+# --- Arrows only for these HCCs ---
 arrow_labels <- c(6, 14.1, 14.3, 22.1)
 
-# ----------------------------------------------------------
-# PLOT FUNCTION (smaller text, longer arrows, custom HCC6)
-# ----------------------------------------------------------
+# --- Plot function (smaller text, repel for all) ---
 plot_hcc_final <- function(data, sex_label) {
   dat_sex <- subset(data, Sex == sex_label)
   centroids <- st_point_on_surface(dat_sex)
@@ -107,63 +99,61 @@ plot_hcc_final <- function(data, sex_label) {
   
   arrow_data <- subset(label_points, com %in% arrow_labels)
   text_data  <- subset(label_points, !(com %in% arrow_labels))
-  
   hcc6_value <- arrow_data$Chronic_Pct[arrow_data$com == 6]
   
   ggplot() +
     geom_sf(data = zones_union, fill = NA, color = "grey35", linewidth = 0.8) +
     geom_sf(data = dat_sex, aes(fill = Chronic_Pct), color = "white", linewidth = 0.4) +
     
-    # Normal labels (smaller)
-    geom_text(
+    # Regular labels with repel (slight nudging to avoid overlap)
+    geom_text_repel(
       data = text_data,
       aes(X, Y, label = paste0(round(Chronic_Pct, 1), "%")),
       color = "black",
-      size = 2.8,
-      fontface = "bold"
+      size = 2.4,
+      fontface = "bold",
+      box.padding = 0.15,
+      point.padding = 0.2,
+      segment.color = NA,
+      max.overlaps = 100,
+      min.segment.length = 0
     ) +
     
-    # Arrows (longer, smaller text)
+    # Arrows for small HCCs
     geom_text_repel(
       data = arrow_data,
       aes(X, Y, label = paste0(round(Chronic_Pct, 1), "%")),
       color = "black",
-      size = 2.8,
+      size = 2.4,
       fontface = "bold",
       segment.color = "black",
-      segment.size = 0.5,
-      box.padding = 0.5,
-      point.padding = 0.3,
-      min.segment.length = 0,
+      segment.size = 0.4,
+      box.padding = 0.4,
+      point.padding = 0.2,
       force = 6,
-      max.overlaps = 100,
-      nudge_x = 1.2,
-      nudge_y = 1.2,
-      arrow = arrow(length = unit(0.3, "inches"), type = "closed")
+      nudge_x = 1.5,
+      nudge_y = 1.5,
+      arrow = arrow(length = unit(0.35, "inches"), type = "closed")
     ) +
     
-    # Custom curved HCC6 leader line & label
+    # Custom HCC6 curve + label
     geom_curve(
-      aes(
-        x = -64.95, y = 47.35,
-        xend = -64.5, yend = 47.95
-      ),
+      aes(x = -64.95, y = 47.35, xend = -64.5, yend = 47.95),
       curvature = -0.25,
       color = "black",
-      linewidth = 0.6,
+      linewidth = 0.5,
       arrow = arrow(length = unit(0.3, "inches"))
     ) +
     geom_text(
-      aes(x = -64.45, y = 48,
-          label = paste0(round(hcc6_value, 1), "%")),
+      aes(x = -64.45, y = 48, label = paste0(round(hcc6_value, 1), "%")),
       color = "black",
-      size = 2.8,
+      size = 2.4,
       fontface = "bold"
     ) +
     
+    # Purple gradient (light → dark)
     scale_fill_gradient(
-      low = "#e6ccff",
-      high = "#3f007d",
+      low = "#d8b3ff", high = "#3f007d",
       name = "% Chronic Use",
       na.value = "grey90"
     ) +
@@ -183,16 +173,11 @@ plot_hcc_final <- function(data, sex_label) {
     )
 }
 
-# ----------------------------------------------------------
-# CREATE MAPS
-# ----------------------------------------------------------
+# --- Export high-res ---
 map_men   <- plot_hcc_final(hcc_map, "Men")
 map_women <- plot_hcc_final(hcc_map, "Women")
 map_total <- plot_hcc_final(hcc_map, "Total")
 
-# ----------------------------------------------------------
-# EXPORT HIGH-RES MAPS
-# ----------------------------------------------------------
 agg_png("HCC_Map_Men.png", width = 4000, height = 3200, res = 600);   print(map_men);   dev.off()
 agg_png("HCC_Map_Women.png", width = 4000, height = 3200, res = 600); print(map_women); dev.off()
 agg_png("HCC_Map_Total.png", width = 4000, height = 3200, res = 600); print(map_total); dev.off()
