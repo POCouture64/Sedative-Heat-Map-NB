@@ -78,7 +78,7 @@ df_hcc_final <- bind_rows(df_combined, total_summary) %>%
   mutate(HCC = as.numeric(as.character(HCC)))
 
 # ----------------------------------------------------------
-# LOAD MAPS: Health Councils + Health Zones
+# LOAD MAPS
 # ----------------------------------------------------------
 hcc <- st_read("https://gnb.socrata.com/api/geospatial/sdyn-7de6?method=export&format=GeoJSON", quiet = TRUE) %>%
   st_make_valid() %>%
@@ -98,67 +98,66 @@ zones_union <- st_union(st_make_valid(zones))
 arrow_labels <- c(6, 14.1, 14.3, 22.1)
 
 # ----------------------------------------------------------
-# PLOTTING FUNCTION (smaller text, longer arrows, custom HCC6)
+# PLOT FUNCTION (smaller text, longer arrows, custom HCC6)
 # ----------------------------------------------------------
 plot_hcc_final <- function(data, sex_label) {
   dat_sex <- subset(data, Sex == sex_label)
   centroids <- st_point_on_surface(dat_sex)
   label_points <- cbind(centroids, st_coordinates(centroids$geometry))
   
-  # Split label sets
   arrow_data <- subset(label_points, com %in% arrow_labels)
   text_data  <- subset(label_points, !(com %in% arrow_labels))
   
-  # Get value for HCC6 for manual label
   hcc6_value <- arrow_data$Chronic_Pct[arrow_data$com == 6]
   
   ggplot() +
     geom_sf(data = zones_union, fill = NA, color = "grey35", linewidth = 0.8) +
     geom_sf(data = dat_sex, aes(fill = Chronic_Pct), color = "white", linewidth = 0.4) +
     
-    # Normal inside labels
+    # Normal labels (smaller)
     geom_text(
       data = text_data,
       aes(X, Y, label = paste0(round(Chronic_Pct, 1), "%")),
       color = "black",
-      size = 3.4,
+      size = 2.8,
       fontface = "bold"
     ) +
     
-    # Arrows for specified HCCs
+    # Arrows (longer, smaller text)
     geom_text_repel(
       data = arrow_data,
       aes(X, Y, label = paste0(round(Chronic_Pct, 1), "%")),
       color = "black",
-      size = 3.4,
+      size = 2.8,
       fontface = "bold",
       segment.color = "black",
       segment.size = 0.5,
-      box.padding = 0.4,
+      box.padding = 0.5,
+      point.padding = 0.3,
       min.segment.length = 0,
-      force = 5,
-      max.overlaps = 50,
-      nudge_x = 0.5,
-      nudge_y = 0.5,
-      arrow = arrow(length = unit(0.25, "inches"), type = "closed")
+      force = 6,
+      max.overlaps = 100,
+      nudge_x = 1.2,
+      nudge_y = 1.2,
+      arrow = arrow(length = unit(0.3, "inches"), type = "closed")
     ) +
     
-    # Custom "HCC 6" leader line & label
+    # Custom curved HCC6 leader line & label
     geom_curve(
       aes(
-        x = -64.95, y = 47.35,  # start (roughly center of HCC6)
-        xend = -64.5, yend = 47.9  # end (point for label)
+        x = -64.95, y = 47.35,
+        xend = -64.5, yend = 47.95
       ),
-      curvature = -0.2,
+      curvature = -0.25,
       color = "black",
       linewidth = 0.6,
-      arrow = arrow(length = unit(0.25, "inches"))
+      arrow = arrow(length = unit(0.3, "inches"))
     ) +
     geom_text(
-      aes(x = -64.45, y = 47.95,
+      aes(x = -64.45, y = 48,
           label = paste0(round(hcc6_value, 1), "%")),
       color = "black",
-      size = 3.4,
+      size = 2.8,
       fontface = "bold"
     ) +
     
