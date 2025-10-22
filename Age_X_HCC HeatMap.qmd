@@ -130,9 +130,9 @@ plot_hcc_final <- function(data, sex_label) {
         com == 6 ~ Y + 0.4,
         com == 7 ~ Y + 0.3,
         com == 8 ~ Y + 0.2,
-        # East coast cluster - spread vertically with gap between 14.2 and 11
-        com == 14.1 ~ Y + 0.5,
-        com == 14.2 ~ Y + 0.15,
+        # East coast cluster (Zone 1) - 14.2 above 14.1, 14.3 down
+        com == 14.1 ~ Y + 0.35,
+        com == 14.2 ~ Y + 0.65,
         com == 14.3 ~ Y - 0.7,
         # Southeast
         com == 11 ~ Y + 0.5,
@@ -156,8 +156,8 @@ plot_hcc_final <- function(data, sex_label) {
         com == 6 ~ Y + 0.47,
         com == 7 ~ Y + 0.37,
         com == 8 ~ Y + 0.27,
-        com == 14.1 ~ Y + 0.57,
-        com == 14.2 ~ Y + 0.22,
+        com == 14.1 ~ Y + 0.42,
+        com == 14.2 ~ Y + 0.72,
         com == 14.3 ~ Y - 0.77,
         com == 11 ~ Y + 0.57,
         com == 22.1 ~ Y - 0.77,
