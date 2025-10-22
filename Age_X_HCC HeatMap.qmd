@@ -88,78 +88,69 @@ hcc_map <- hcc %>%
 
 zones_union <- st_union(st_make_valid(zones))
 
-# --- HCCs that need leaders ---
-arrow_labels <- c(6, 14.1, 14.3, 22.1)
-
 # --- Plot function ---
 plot_hcc_final <- function(data, sex_label) {
   dat_sex <- subset(data, Sex == sex_label)
-  centroids <- st_point_on_surface(dat_sex)
-  label_points <- cbind(centroids, st_coordinates(centroids$geometry))
   
-  arrow_data <- subset(label_points, com %in% arrow_labels)
-  text_data  <- subset(label_points, !(com %in% arrow_labels))
-  hcc6_value <- arrow_data$Chronic_Pct[arrow_data$com == 6]
+  # Get label positions
+  centroids <- st_point_on_surface(dat_sex)
+  coords <- as.data.frame(st_coordinates(centroids))
+  centroids <- cbind(dat_sex, coords)
+  
+  # Define which HCCs get arrows
+  arrow_hccs <- c(6, 14.1, 14.3, 22.1)
+  
+  # Base label positions
+  centroids <- centroids %>%
+    mutate(
+      xend = X,
+      yend = Y,
+      label_x = X,
+      label_y = Y
+    )
+  
+  # Extend arrows outward for the specified HCCs
+  centroids <- centroids %>%
+    mutate(
+      xend = ifelse(com %in% arrow_hccs, X + 0.3, X),
+      yend = ifelse(com %in% arrow_hccs, Y + 0.3, Y),
+      label_x = ifelse(com %in% arrow_hccs, X + 0.35, X),
+      label_y = ifelse(com %in% arrow_hccs, Y + 0.35, Y)
+    )
   
   ggplot() +
-    geom_sf(data = zones_union, fill = NA, color = "grey35", linewidth = 0.8) +
+    geom_sf(data = zones_union, fill = NA, color = "grey40", linewidth = 0.8) +
     geom_sf(data = dat_sex, aes(fill = Chronic_Pct), color = "white", linewidth = 0.4) +
-
-    # Regular labels (slight repel)
-    geom_text_repel(
-      data = text_data,
-      aes(X, Y, label = paste0(round(Chronic_Pct, 1), "%")),
-      color = "black",
-      size = 2.4,
-      fontface = "bold",
-      box.padding = 0.15,
-      point.padding = 0.2,
-      segment.color = NA,
-      max.overlaps = 100
-    ) +
-
-    # Simple straight lines for small HCCs
+    
+    # Add arrows only for selected HCCs
     geom_segment(
-      data = arrow_data,
-      aes(x = X, y = Y, xend = X + 0.5, yend = Y + 0.5),
+      data = subset(centroids, com %in% arrow_hccs),
+      aes(x = X, y = Y, xend = xend, yend = yend),
+      arrow = arrow(length = unit(0.15, "inches")),
       color = "black",
       linewidth = 0.3
     ) +
+    
+    # Add text (inside for most, outside for those with arrows)
     geom_text(
-      data = arrow_data,
-      aes(x = X + 0.55, y = Y + 0.55, label = paste0(round(Chronic_Pct, 1), "%")),
+      data = centroids,
+      aes(x = label_x, y = label_y, label = paste0(round(Chronic_Pct, 1), "%")),
       color = "black",
-      size = 2.4,
+      size = 2.3,
       fontface = "bold"
     ) +
-
-    # Custom curve + label for HCC 6
-    geom_curve(
-      aes(x = -64.95, y = 47.35, xend = -64.5, yend = 47.95),
-      curvature = -0.25,
-      color = "black",
-      linewidth = 0.4
-    ) +
-    geom_text(
-      aes(x = -64.45, y = 48, label = paste0(round(hcc6_value, 1), "%")),
-      color = "black",
-      size = 2.4,
-      fontface = "bold"
-    ) +
-
-    # Purple fill (light = low, dark = high)
+    
     scale_fill_gradient(
-      low = "#d7bdfc", high = "#3f007d",
-      name = "% Chronic Use",
-      na.value = "grey90"
+      low = "#e6d3fa", high = "#3f007d",
+      name = "% Chronic Use", na.value = "grey90"
     ) +
-
+    
     labs(
       title = paste("Chronic BZRA Use by Health Council (HCC) –", sex_label),
       subtitle = "Darker = Higher % Chronic Use",
       caption = "Data source: SIMOA + NBHC Health Councils"
     ) +
-
+    
     theme_void(base_size = 14) +
     theme(
       legend.position = "none",
