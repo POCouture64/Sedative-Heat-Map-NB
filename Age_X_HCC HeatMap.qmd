@@ -17,18 +17,22 @@ View(Age_x_HCC_Sheet)
 Age_x_HCC_Sheet <- Age_x_HCC_Sheet[, !names(Age_x_HCC_Sheet) %in% c("...8", "...9")]
 ```
 
-## Complete Code
+## Chronic Use % by HCC and Sex
 
 ```{r}
 #|label: Complete Code Used for Analysis
+
 # ----------------------------------------------------------
 # LOAD PACKAGES
 # ----------------------------------------------------------
+# install.packages("lwgeom")
+
 library(dplyr)
 library(sf)
 library(ggplot2)
 library(ggrepel)
 library(ragg)
+library(lwgeom)  
 
 # ----------------------------------------------------------
 # SUMMARIZE DATA
@@ -77,40 +81,45 @@ df_hcc_final <- bind_rows(df_combined, total_summary) %>%
 # ----------------------------------------------------------
 # LOAD MAPS: Health Councils + Health Zones
 # ----------------------------------------------------------
-# HCC boundaries
 hcc <- st_read("https://gnb.socrata.com/api/geospatial/sdyn-7de6?method=export&format=GeoJSON", quiet = TRUE) %>%
+  st_make_valid() %>%
   mutate(com = as.numeric(com))
 
-# Zone boundaries (7 zones)
-zones <- st_read("https://gnb.socrata.com/api/geospatial/x8mg-22ju?method=export&format=GeoJSON", quiet = TRUE)
+zones <- st_read("https://gnb.socrata.com/api/geospatial/x8mg-22ju?method=export&format=GeoJSON", quiet = TRUE) %>%
+  st_make_valid()
 
-# Join data
+# Join your data
 hcc_map <- hcc %>%
   left_join(df_hcc_final, by = c("com" = "HCC"))
 
+# Make zone outlines continuous (fixed geometry)
+zones_union <- st_union(st_make_valid(zones))
+
 # ----------------------------------------------------------
-# PLOTTING FUNCTION
+# PLOTTING FUNCTION (with arrows)
 # ----------------------------------------------------------
-plot_hcc_purple <- function(data, sex_label) {
-  # Filter and get centroids for text
+plot_hcc_with_arrows <- function(data, sex_label) {
   dat_sex <- subset(data, Sex == sex_label)
-  centroids <- st_centroid(dat_sex)
-  centroids_coords <- cbind(centroids, st_coordinates(st_centroid(centroids$geometry)))
+  
+  centroids <- st_point_on_surface(dat_sex)
+  label_points <- cbind(centroids, st_coordinates(centroids$geometry))
   
   ggplot() +
-    # Zones (thin grey outlines)
-    geom_sf(data = zones, fill = NA, color = "grey40", linewidth = 0.6) +
-    # Health councils (purple fill)
-    geom_sf(data = dat_sex, aes(fill = Chronic_Pct), color = "white", linewidth = 0.3) +
-    # Percentage labels
-    geom_text(
-      data = centroids_coords,
+    geom_sf(data = zones_union, fill = NA, color = "grey35", linewidth = 0.8) +
+    geom_sf(data = dat_sex, aes(fill = Chronic_Pct), color = "white", linewidth = 0.4) +
+    geom_text_repel(
+      data = label_points,
       aes(X, Y, label = paste0(round(Chronic_Pct, 1), "%")),
-      color = ifelse(centroids_coords$Chronic_Pct < 25, "black", "white"), # black for light areas
-      size = 3.8,
-      fontface = "bold"
+      color = ifelse(label_points$Chronic_Pct < 25, "black", "white"),
+      size = 4.2,
+      fontface = "bold",
+      segment.color = "black",
+      segment.size = 0.4,
+      box.padding = 0.3,
+      min.segment.length = 0,
+      force = 8,
+      max.overlaps = Inf
     ) +
-    # Purple gradient: light → dark = less → more use
     scale_fill_gradient(
       low = "#e6ccff",   # light purple
       high = "#3f007d",  # dark purple
@@ -124,7 +133,7 @@ plot_hcc_purple <- function(data, sex_label) {
     ) +
     theme_void(base_size = 14) +
     theme(
-      legend.position = "bottom",
+      legend.position = "none",
       plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
       plot.subtitle = element_text(size = 12, hjust = 0.5),
       plot.caption = element_text(size = 10, hjust = 1)
@@ -134,15 +143,14 @@ plot_hcc_purple <- function(data, sex_label) {
 # ----------------------------------------------------------
 # CREATE MAPS
 # ----------------------------------------------------------
-map_men   <- plot_hcc_purple(hcc_map, "Men")
-map_women <- plot_hcc_purple(hcc_map, "Women")
-map_total <- plot_hcc_purple(hcc_map, "Total")
+map_men   <- plot_hcc_with_arrows(hcc_map, "Men")
+map_women <- plot_hcc_with_arrows(hcc_map, "Women")
+map_total <- plot_hcc_with_arrows(hcc_map, "Total")
 
 # ----------------------------------------------------------
-# EXPORT HIGH-RES POSTER MAPS (600 DPI)
+# EXPORT HIGH-RES MAPS
 # ----------------------------------------------------------
 agg_png("HCC_Map_Men.png", width = 4000, height = 3200, res = 600);   print(map_men);   dev.off()
 agg_png("HCC_Map_Women.png", width = 4000, height = 3200, res = 600); print(map_women); dev.off()
 agg_png("HCC_Map_Total.png", width = 4000, height = 3200, res = 600); print(map_total); dev.off()
-
 ```
