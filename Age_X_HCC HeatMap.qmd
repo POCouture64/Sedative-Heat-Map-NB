@@ -1,0 +1,167 @@
+---
+title: "Sedative Heat Map NB"
+author: "PO Couture"
+format: html
+editor: visual
+---
+
+## Quarto
+
+Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
+
+## Running Code
+
+When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+
+```{r}
+library(sf)
+library(dplyr)
+library(ggplot2)
+library(viridis)
+library(ggrepel)
+library(readxl)
+library(stringr)
+```
+
+You can add options to executable code like this
+
+```{r}
+Age_x_HCC_Sheet <- read_excel("Age x HCC Sheet.xlsx")
+glimpse(Age_x_HCC_Sheet)
+View(Age_x_HCC_Sheet)
+
+Age_x_HCC_Sheet <- Age_x_HCC_Sheet[, !names(Age_x_HCC_Sheet) %in% c("...8", "...9")]
+```
+## Making Long Data
+
+```{r}
+#|label: Making Long Data
+
+# ---- Create male, female, and total datasets ----
+male_df <- Age_x_HCC_Sheet %>%
+  transmute(
+    Sex = "Men",
+    HCC = M_HCC,
+    Age_Group = M_Age_Group,
+    Any_Use = `M_Any_Use(total)`,
+    Chronic_Pct = `M_Percentage_Chronic(total)`,
+    Population = M_Estimated_Total_Population
+  )
+
+female_df <- Age_x_HCC_Sheet %>%
+  transmute(
+    Sex = "Women",
+    HCC = W_HCC,
+    Age_Group = W_Age_Group,
+    Any_Use = `W_Any_Use(total)`,
+    Chronic_Pct = `W_Percentage_Chronic(total)`,
+    Population = W_Estimated_Total_Population
+  )
+
+# Combine sexes
+df_long <- bind_rows(male_df, female_df)
+
+# Compute totals (men + women)
+df_total <- df_long %>%
+  group_by(HCC, Age_Group) %>%
+  summarise(
+    Sex = "Total",
+    Any_Use = sum(Any_Use, na.rm = TRUE),
+    Population = sum(Population, na.rm = TRUE),
+    Chronic_Pct = 100 * sum(Any_Use * (Chronic_Pct / 100), na.rm = TRUE) / sum(Any_Use, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+df_all <- bind_rows(df_long, df_total) %>%
+  mutate(
+    HCC = factor(HCC, levels = sort(unique(HCC))),
+    Sex = factor(Sex, levels = c("Men", "Women", "Total")),
+    Age_Group = factor(Age_Group, levels = c("65-69", "70-74", "75-79", "80-84", "85+"))
+  )
+```
+
+
+## Map Data
+
+```{r}
+# Health Council (HCC) boundaries
+hcc <- st_read("https://gnb.socrata.com/api/geospatial/sdyn-7de6?method=export&format=GeoJSON", quiet = TRUE)
+names(hcc)
+head(hcc)
+
+# Make sure HCC numbers are numeric for the join
+df_all <- df_all %>%
+  mutate(HCC = as.numeric(as.character(HCC)))
+
+hcc <- hcc %>%
+  mutate(com = as.numeric(com))  # 'com' is the HCC code field
+
+# Join shapefile to your HCC data
+hcc_map <- hcc %>%
+  left_join(df_all, by = c("com" = "HCC"))
+```
+
+
+
+
+
+## Heatmap
+
+```{r}
+#|label: Heatmap Count
+
+ggplot(df_all, aes(x = HCC, y = Age_Group, fill = Any_Use)) +
+  geom_tile(color = "white") +
+  facet_wrap(~Sex, ncol = 3) +
+  scale_fill_viridis_c(option = "plasma") +
+  labs(
+    title = "BZRA Use by Age Group and Health Zone",
+    x = "Health Zone (HCC)",
+    y = "Age Group",
+    fill = "BZRA Users (Count)"
+  ) +
+  theme_minimal(base_size = 12)
+
+```
+
+```{r}
+#| label: Heat Map Chronic Use %
+
+# Define a reusable plotting function
+plot_hcc_map <- function(data, sex_label) {
+  ggplot(subset(data, Sex == sex_label)) +
+    geom_sf(aes(fill = Chronic_Pct), color = "white", linewidth = 0.4) +
+    geom_sf_text(aes(label = round(Any_Use, 0)), size = 3.5, color = "black") +
+    scale_fill_viridis_c(option = "magma", name = "% Chronic Use", na.value = "grey90") +
+    labs(
+      title = paste("Chronic BZRA Use by Health Council (HCC) –", sex_label),
+      subtitle = "Colour = % Chronic Use, Number = Total BZRA Users",
+      caption = "Data source: SIMOA + NBHC Health Councils"
+    ) +
+    theme_void(base_size = 14) +
+    theme(
+      legend.position = "bottom",
+      plot.title = element_text(size = 18, face = "bold", hjust = 0.5),
+      plot.subtitle = element_text(size = 12, hjust = 0.5),
+      plot.caption = element_text(size = 10, hjust = 1)
+    )
+}
+
+# Generate and display each map
+map_men    <- plot_hcc_map(hcc_map, "Men")
+map_women  <- plot_hcc_map(hcc_map, "Women")
+map_total  <- plot_hcc_map(hcc_map, "Total")
+
+# Show one at a time (in RStudio or Quarto)
+map_men
+map_women
+map_total
+
+# Save high-resolution files (perfect for posters)
+ggsave("HCC_Map_Men.png",    map_men,   width = 10, height = 8, dpi = 300)
+ggsave("HCC_Map_Women.png",  map_women, width = 10, height = 8, dpi = 300)
+ggsave("HCC_Map_Total.png",  map_total, width = 10, height = 8, dpi = 300)
+```
+
+
+The `echo: false` option disables the printing of code (only output is displayed).
