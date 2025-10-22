@@ -37,7 +37,6 @@ library(lwgeom)
 # ----------------------------------------------------------
 # SUMMARIZE DATA
 # ----------------------------------------------------------
-
 # --- Men ---
 men_summary <- Age_x_HCC_Sheet %>%
   group_by(M_HCC) %>%
@@ -96,29 +95,34 @@ hcc_map <- hcc %>%
 zones_union <- st_union(st_make_valid(zones))
 
 # ----------------------------------------------------------
-# PLOTTING FUNCTION (with arrows)
+# PLOTTING FUNCTION (black text + auto arrows)
 # ----------------------------------------------------------
-plot_hcc_with_arrows <- function(data, sex_label) {
+plot_hcc_final <- function(data, sex_label) {
   dat_sex <- subset(data, Sex == sex_label)
   
   centroids <- st_point_on_surface(dat_sex)
   label_points <- cbind(centroids, st_coordinates(centroids$geometry))
   
   ggplot() +
+    # Grey zone outlines
     geom_sf(data = zones_union, fill = NA, color = "grey35", linewidth = 0.8) +
+    # Fill for each HCC
     geom_sf(data = dat_sex, aes(fill = Chronic_Pct), color = "white", linewidth = 0.4) +
+    # Label with optional arrows (only when overlapping)
     geom_text_repel(
       data = label_points,
       aes(X, Y, label = paste0(round(Chronic_Pct, 1), "%")),
-      color = ifelse(label_points$Chronic_Pct < 25, "black", "white"),
+      color = "black",
       size = 4.2,
       fontface = "bold",
       segment.color = "black",
       segment.size = 0.4,
       box.padding = 0.3,
       min.segment.length = 0,
-      force = 8,
-      max.overlaps = Inf
+      force = 2,         # gentle repelling so only crowded ones move
+      max.overlaps = 50, # allows most labels to stay inside
+      nudge_x = 0,
+      nudge_y = 0
     ) +
     scale_fill_gradient(
       low = "#e6ccff",   # light purple
@@ -143,9 +147,9 @@ plot_hcc_with_arrows <- function(data, sex_label) {
 # ----------------------------------------------------------
 # CREATE MAPS
 # ----------------------------------------------------------
-map_men   <- plot_hcc_with_arrows(hcc_map, "Men")
-map_women <- plot_hcc_with_arrows(hcc_map, "Women")
-map_total <- plot_hcc_with_arrows(hcc_map, "Total")
+map_men   <- plot_hcc_final(hcc_map, "Men")
+map_women <- plot_hcc_final(hcc_map, "Women")
+map_total <- plot_hcc_final(hcc_map, "Total")
 
 # ----------------------------------------------------------
 # EXPORT HIGH-RES MAPS
