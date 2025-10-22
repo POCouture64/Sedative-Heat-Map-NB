@@ -75,7 +75,7 @@ total_summary <- df_combined %>%
 df_hcc_final <- bind_rows(df_combined, total_summary) %>%
   mutate(HCC = as.numeric(as.character(HCC)))
 
-# --- Load map ---
+# --- Load shapefiles ---
 hcc <- st_read("https://gnb.socrata.com/api/geospatial/sdyn-7de6?method=export&format=GeoJSON", quiet = TRUE) %>%
   st_make_valid() %>%
   mutate(com = as.numeric(com))
@@ -88,10 +88,10 @@ hcc_map <- hcc %>%
 
 zones_union <- st_union(st_make_valid(zones))
 
-# --- Arrows only for these HCCs ---
+# --- HCCs that need leaders ---
 arrow_labels <- c(6, 14.1, 14.3, 22.1)
 
-# --- Plot function (smaller text, repel for all) ---
+# --- Plot function ---
 plot_hcc_final <- function(data, sex_label) {
   dat_sex <- subset(data, Sex == sex_label)
   centroids <- st_point_on_surface(dat_sex)
@@ -104,8 +104,8 @@ plot_hcc_final <- function(data, sex_label) {
   ggplot() +
     geom_sf(data = zones_union, fill = NA, color = "grey35", linewidth = 0.8) +
     geom_sf(data = dat_sex, aes(fill = Chronic_Pct), color = "white", linewidth = 0.4) +
-    
-    # Regular labels with repel (slight nudging to avoid overlap)
+
+    # Regular labels (slight repel)
     geom_text_repel(
       data = text_data,
       aes(X, Y, label = paste0(round(Chronic_Pct, 1), "%")),
@@ -115,34 +115,30 @@ plot_hcc_final <- function(data, sex_label) {
       box.padding = 0.15,
       point.padding = 0.2,
       segment.color = NA,
-      max.overlaps = 100,
-      min.segment.length = 0
+      max.overlaps = 100
     ) +
-    
-    # Arrows for small HCCs
-    geom_text_repel(
+
+    # Simple straight lines for small HCCs
+    geom_segment(
       data = arrow_data,
-      aes(X, Y, label = paste0(round(Chronic_Pct, 1), "%")),
+      aes(x = X, y = Y, xend = X + 0.5, yend = Y + 0.5),
+      color = "black",
+      linewidth = 0.3
+    ) +
+    geom_text(
+      data = arrow_data,
+      aes(x = X + 0.55, y = Y + 0.55, label = paste0(round(Chronic_Pct, 1), "%")),
       color = "black",
       size = 2.4,
-      fontface = "bold",
-      segment.color = "black",
-      segment.size = 0.4,
-      box.padding = 0.4,
-      point.padding = 0.2,
-      force = 6,
-      nudge_x = 1.5,
-      nudge_y = 1.5,
-      arrow = arrow(length = unit(0.35, "inches"), type = "closed")
+      fontface = "bold"
     ) +
-    
-    # Custom HCC6 curve + label
+
+    # Custom curve + label for HCC 6
     geom_curve(
       aes(x = -64.95, y = 47.35, xend = -64.5, yend = 47.95),
       curvature = -0.25,
       color = "black",
-      linewidth = 0.5,
-      arrow = arrow(length = unit(0.3, "inches"))
+      linewidth = 0.4
     ) +
     geom_text(
       aes(x = -64.45, y = 48, label = paste0(round(hcc6_value, 1), "%")),
@@ -150,20 +146,20 @@ plot_hcc_final <- function(data, sex_label) {
       size = 2.4,
       fontface = "bold"
     ) +
-    
-    # Purple gradient (light → dark)
+
+    # Purple fill (light = low, dark = high)
     scale_fill_gradient(
-      low = "#d8b3ff", high = "#3f007d",
+      low = "#d7bdfc", high = "#3f007d",
       name = "% Chronic Use",
       na.value = "grey90"
     ) +
-    
+
     labs(
       title = paste("Chronic BZRA Use by Health Council (HCC) –", sex_label),
       subtitle = "Darker = Higher % Chronic Use",
       caption = "Data source: SIMOA + NBHC Health Councils"
     ) +
-    
+
     theme_void(base_size = 14) +
     theme(
       legend.position = "none",
@@ -173,7 +169,7 @@ plot_hcc_final <- function(data, sex_label) {
     )
 }
 
-# --- Export high-res ---
+# --- Export ---
 map_men   <- plot_hcc_final(hcc_map, "Men")
 map_women <- plot_hcc_final(hcc_map, "Women")
 map_total <- plot_hcc_final(hcc_map, "Total")
