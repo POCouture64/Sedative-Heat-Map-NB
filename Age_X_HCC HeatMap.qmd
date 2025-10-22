@@ -25,8 +25,6 @@ Age_x_HCC_Sheet <- Age_x_HCC_Sheet[, !names(Age_x_HCC_Sheet) %in% c("...8", "...
 # ----------------------------------------------------------
 # LOAD PACKAGES
 # ----------------------------------------------------------
-# install.packages("lwgeom")
-
 library(dplyr)
 library(sf)
 library(ggplot2)
@@ -92,13 +90,13 @@ zones_union <- st_union(st_make_valid(zones))
 plot_hcc_final <- function(data, sex_label) {
   dat_sex <- subset(data, Sex == sex_label)
   
-  # Get label positions
+  # Get label positions - use st_point_on_surface to ensure points are inside polygons
   centroids <- st_point_on_surface(dat_sex)
   coords <- as.data.frame(st_coordinates(centroids))
   centroids <- cbind(dat_sex, coords)
   
-  # Define which HCCs get arrows
-  arrow_hccs <- c(6, 14.1, 14.3, 22.1)
+  # Define which HCCs get arrows pointing outside
+  arrow_hccs <- c(5, 6, 7, 8, 11, 14.1, 14.2, 14.3, 22.1)
   
   # Base label positions
   centroids <- centroids %>%
@@ -109,20 +107,69 @@ plot_hcc_final <- function(data, sex_label) {
       label_y = Y
     )
   
-  # Extend arrows outward for the specified HCCs
+  # Custom arrow directions and distances for each HCC
   centroids <- centroids %>%
     mutate(
-      xend = ifelse(com %in% arrow_hccs, X + 0.3, X),
-      yend = ifelse(com %in% arrow_hccs, Y + 0.3, Y),
-      label_x = ifelse(com %in% arrow_hccs, X + 0.35, X),
-      label_y = ifelse(com %in% arrow_hccs, Y + 0.35, Y)
+      # Northeast cluster (Zone 6/7)
+      xend = case_when(
+        com == 5 ~ X + 0.65,
+        com == 6 ~ X + 0.7,
+        com == 7 ~ X + 0.75,
+        com == 8 ~ X + 0.8,
+        # East coast cluster (Zone 1)
+        com == 14.1 ~ X + 0.7,
+        com == 14.2 ~ X + 0.65,
+        com == 14.3 ~ X + 0.75,
+        # Southeast
+        com == 11 ~ X + 0.6,
+        com == 22.1 ~ X + 0.5,
+        TRUE ~ X
+      ),
+      yend = case_when(
+        com == 5 ~ Y + 0.5,
+        com == 6 ~ Y + 0.55,
+        com == 7 ~ Y + 0.45,
+        com == 8 ~ Y + 0.4,
+        # East coast cluster
+        com == 14.1 ~ Y - 0.1,
+        com == 14.2 ~ Y - 0.2,
+        com == 14.3 ~ Y + 0.5,
+        # Southeast
+        com == 11 ~ Y + 0.5,
+        com == 22.1 ~ Y - 0.2,
+        TRUE ~ Y
+      ),
+      label_x = case_when(
+        com == 5 ~ X + 0.72,
+        com == 6 ~ X + 0.77,
+        com == 7 ~ X + 0.82,
+        com == 8 ~ X + 0.87,
+        com == 14.1 ~ X + 0.77,
+        com == 14.2 ~ X + 0.72,
+        com == 14.3 ~ X + 0.82,
+        com == 11 ~ X + 0.67,
+        com == 22.1 ~ X + 0.57,
+        TRUE ~ X
+      ),
+      label_y = case_when(
+        com == 5 ~ Y + 0.57,
+        com == 6 ~ Y + 0.62,
+        com == 7 ~ Y + 0.52,
+        com == 8 ~ Y + 0.47,
+        com == 14.1 ~ Y - 0.13,
+        com == 14.2 ~ Y - 0.23,
+        com == 14.3 ~ Y + 0.57,
+        com == 11 ~ Y + 0.57,
+        com == 22.1 ~ Y - 0.23,
+        TRUE ~ Y
+      )
     )
   
   ggplot() +
     geom_sf(data = zones_union, fill = NA, color = "grey40", linewidth = 0.8) +
     geom_sf(data = dat_sex, aes(fill = Chronic_Pct), color = "white", linewidth = 0.4) +
     
-    # Add arrows only for selected HCCs
+    # Add arrows for selected HCCs
     geom_segment(
       data = subset(centroids, com %in% arrow_hccs),
       aes(x = X, y = Y, xend = xend, yend = yend),
