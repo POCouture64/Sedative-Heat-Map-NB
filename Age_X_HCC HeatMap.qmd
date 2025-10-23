@@ -122,7 +122,7 @@ plot_hcc_final <- function(data, sex_label) {
         com == 14.3 ~ X + 0.35,
         # Southeast
         com == 11 ~ X + 0.6,
-        com == 22.1 ~ X + 1.4,
+        com == 22.1 ~ X + 1.6,
         TRUE ~ X
       ),
       yend = case_when(
@@ -131,7 +131,7 @@ plot_hcc_final <- function(data, sex_label) {
         com == 7 ~ Y + 0.3,
         com == 8 ~ Y + 0.2,
         # East coast cluster (Zone 1) - 14.2 above 14.1, 14.3 down
-        com == 14.1 ~ Y + 0.45,
+        com == 14.1 ~ Y + 0.50,
         com == 14.2 ~ Y + 0.60,
         com == 14.3 ~ Y - 0.35,
         # Southeast
