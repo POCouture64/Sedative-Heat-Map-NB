@@ -82,7 +82,7 @@ plot_hcc_final <- function(data, sex_label) {
         com == 8    ~ X + 0.92,
         com == 14.3 ~ X + 0.42,
         com == 22.1 ~ X + 2.3,
-        com == 14.1 ~ X + 0.04,   # moved right
+        com == 14.1 ~ X + 0.001,   # moved right
         TRUE        ~ X           # includes com == 11 (keeps original)
       ),
       label_y = case_when(
@@ -90,7 +90,7 @@ plot_hcc_final <- function(data, sex_label) {
         com == 8    ~ Y + 0.27,
         com == 14.3 ~ Y - 0.42,
         com == 22.1 ~ Y - 0.77,
-        com == 14.1 ~ Y - 0.04,   # moved down
+        com == 14.1 ~ Y - 0.001,   # moved down
         TRUE        ~ Y
       )
     )
