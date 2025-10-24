@@ -163,7 +163,7 @@ plot_hcc_final <- function(data, sex_label) {
       color = "black",
       fill = "white",
       size = 1,
-      fontface = "bold",
+      fontface = "plain",
       label.padding = unit(0.08, "lines"),
       label.size = 0
     ) +
