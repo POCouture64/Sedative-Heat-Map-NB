@@ -88,7 +88,7 @@ hcc_map <- hcc %>%
 zones_union <- st_union(st_make_valid(zones))
 
 # ----------------------------------------------------------
-# PLOT FUNCTION
+# PLOT FUNCTION (Final Version)
 # ----------------------------------------------------------
 plot_hcc_final <- function(data, sex_label) {
   dat_sex <- subset(data, Sex == sex_label)
@@ -101,7 +101,7 @@ plot_hcc_final <- function(data, sex_label) {
   # HCCs with arrows
   arrow_hccs <- c(6, 8, 14.3, 22.1)
   
-  # Adjust label and arrow positions
+  # Adjust positions
   centroids <- centroids %>%
     mutate(
       xend = X,
@@ -130,8 +130,8 @@ plot_hcc_final <- function(data, sex_label) {
         com == 8 ~ X + 0.92,
         com == 14.3 ~ X + 0.42,
         com == 22.1 ~ X + 2.3,
-        com == 11 ~ X - 0.05,   # slightly more right
-        com == 14.1 ~ X + 0.05, # slightly right
+        com == 11 ~ X - 0.05,    # slight right shift
+        com == 14.1 ~ X + 0.05,  # slightly right
         TRUE ~ X
       ),
       label_y = case_when(
@@ -140,20 +140,18 @@ plot_hcc_final <- function(data, sex_label) {
         com == 14.3 ~ Y - 0.42,
         com == 22.1 ~ Y - 0.77,
         com == 11 ~ Y + 0.10,
-        com == 14.1 ~ Y - 0.125, # half the previous downward shift
+        com == 14.1 ~ Y + 0.08,  # raised higher
         TRUE ~ Y
       )
     )
-  
-  # Convert bounding box to sf polygon
-  bbox_poly <- st_as_sfc(st_bbox(hcc_map))
   
   # ----------------------------------------------------------
   # PLOT
   # ----------------------------------------------------------
   ggplot() +
-    geom_sf(data = bbox_poly, fill = NA, color = "grey50", linewidth = 1) +
+    # Keep the health zone outlines
     geom_sf(data = zones_union, fill = NA, color = "grey40", linewidth = 0.8) +
+    # Health council polygons
     geom_sf(data = dat_sex, aes(fill = Chronic_Pct), color = "white", linewidth = 0.4) +
     
     # Arrows for selected HCCs only
@@ -165,12 +163,12 @@ plot_hcc_final <- function(data, sex_label) {
       linewidth = 0.3
     ) +
     
-    # Labels
+    # Labels (slightly transparent white background)
     geom_label(
       data = centroids,
       aes(x = label_x, y = label_y, label = paste0(round(Chronic_Pct, 1), "%")),
       color = "black",
-      fill = "white",
+      fill = alpha("white", 0.8),
       size = 2.2,
       fontface = "plain",
       label.padding = unit(0.08, "lines"),
