@@ -95,8 +95,8 @@ plot_hcc_final <- function(data, sex_label) {
   coords <- as.data.frame(st_coordinates(centroids))
   centroids <- cbind(dat_sex, coords)
   
-  # Define which HCCs get arrows pointing outside (removed 5, 7, 11, 14.1, 14.2)
-  arrow_hccs <- c(6, 8, 14.3, 22.1)
+  # Define which HCCs get arrows pointing outside (removed 5, 7, 8, 11, 14.1, 14.2)
+  arrow_hccs <- c(6, 14.3, 22.1)
   
   # Base label positions
   centroids <- centroids %>%
@@ -110,10 +110,9 @@ plot_hcc_final <- function(data, sex_label) {
   # Custom arrow directions and distances for each HCC with arrows
   centroids <- centroids %>%
     mutate(
-      # Northeast cluster - only 6 and 8 get arrows
+      # Northeast cluster - only 6 gets arrow
       xend = case_when(
         com == 6 ~ X + 0.75,
-        com == 8 ~ X + 0.85,
         # East coast - only 14.3 gets arrow
         com == 14.3 ~ X + 0.35,
         # Southeast
@@ -122,21 +121,18 @@ plot_hcc_final <- function(data, sex_label) {
       ),
       yend = case_when(
         com == 6 ~ Y + 0.6,
-        com == 8 ~ Y + 0.2,
         com == 14.3 ~ Y - 0.35,
         com == 22.1 ~ Y - 0.7,
         TRUE ~ Y
       ),
       label_x = case_when(
         com == 6 ~ X + 0.82,
-        com == 8 ~ X + 0.92,
         com == 14.3 ~ X + 0.42,
         com == 22.1 ~ X + 2.3,
         TRUE ~ X
       ),
       label_y = case_when(
         com == 6 ~ Y + 0.67,
-        com == 8 ~ Y + 0.27,
         com == 14.3 ~ Y - 0.42,
         com == 22.1 ~ Y - 0.77,
         TRUE ~ Y
