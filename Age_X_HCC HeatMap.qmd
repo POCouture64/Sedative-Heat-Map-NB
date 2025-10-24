@@ -95,8 +95,8 @@ plot_hcc_final <- function(data, sex_label) {
   coords <- as.data.frame(st_coordinates(centroids))
   centroids <- cbind(dat_sex, coords)
   
-  # Define which HCCs get arrows pointing outside
-  arrow_hccs <- c(5, 6, 7, 8, 11, 14.1, 14.2, 14.3, 22.1)
+  # Define which HCCs get arrows pointing outside (removed 5, 7, 11, 14.1, 14.2)
+  arrow_hccs <- c(6, 8, 14.3, 22.1)
   
   # Base label positions
   centroids <- centroids %>%
@@ -107,59 +107,37 @@ plot_hcc_final <- function(data, sex_label) {
       label_y = Y
     )
   
-  # Custom arrow directions and distances for each HCC
+  # Custom arrow directions and distances for each HCC with arrows
   centroids <- centroids %>%
     mutate(
-      # Northeast cluster (Zone 6/7) - spread them out vertically
+      # Northeast cluster - only 6 and 8 get arrows
       xend = case_when(
-        com == 5 ~ X + 0.6,
-        com == 6 ~ X + 0.65,
-        com == 7 ~ X + 0.7,
-        com == 8 ~ X + 0.75,
-        # East coast cluster (Zone 1) - 14.2 above 14.1, avoid overlap with 11
-        com == 14.1 ~ X + 0.8,
-        com == 14.2 ~ X + 0.7,
+        com == 6 ~ X + 0.75,
+        com == 8 ~ X + 0.85,
+        # East coast - only 14.3 gets arrow
         com == 14.3 ~ X + 0.35,
         # Southeast
-        com == 11 ~ X + 0.6,
         com == 22.1 ~ X + 2.2,
         TRUE ~ X
       ),
       yend = case_when(
-        com == 5 ~ Y + 0.5,
-        com == 6 ~ Y + 0.4,
-        com == 7 ~ Y + 0.3,
+        com == 6 ~ Y + 0.6,
         com == 8 ~ Y + 0.2,
-        # East coast cluster (Zone 1) - 14.2 above 14.1, 14.3 down
-        com == 14.1 ~ Y + 0.35,
-        com == 14.2 ~ Y + 0.75,
         com == 14.3 ~ Y - 0.35,
-        # Southeast
-        com == 11 ~ Y + 0.5,
         com == 22.1 ~ Y - 0.7,
         TRUE ~ Y
       ),
       label_x = case_when(
-        com == 5 ~ X + 0.67,
-        com == 6 ~ X + 0.72,
-        com == 7 ~ X + 0.77,
-        com == 8 ~ X + 0.82,
-        com == 14.1 ~ X + 0.87,
-        com == 14.2 ~ X + 0.77,
+        com == 6 ~ X + 0.82,
+        com == 8 ~ X + 0.92,
         com == 14.3 ~ X + 0.42,
-        com == 11 ~ X + 0.67,
         com == 22.1 ~ X + 2.3,
         TRUE ~ X
       ),
       label_y = case_when(
-        com == 5 ~ Y + 0.57,
-        com == 6 ~ Y + 0.47,
-        com == 7 ~ Y + 0.37,
+        com == 6 ~ Y + 0.67,
         com == 8 ~ Y + 0.27,
-        com == 14.1 ~ Y + 0.42,
-        com == 14.2 ~ Y + 0.82,
         com == 14.3 ~ Y - 0.42,
-        com == 11 ~ Y + 0.57,
         com == 22.1 ~ Y - 0.77,
         TRUE ~ Y
       )
@@ -169,7 +147,7 @@ plot_hcc_final <- function(data, sex_label) {
     geom_sf(data = zones_union, fill = NA, color = "grey40", linewidth = 0.8) +
     geom_sf(data = dat_sex, aes(fill = Chronic_Pct), color = "white", linewidth = 0.4) +
     
-    # Add arrows for selected HCCs
+    # Add arrows for selected HCCs only
     geom_segment(
       data = subset(centroids, com %in% arrow_hccs),
       aes(x = X, y = Y, xend = xend, yend = yend),
@@ -178,13 +156,16 @@ plot_hcc_final <- function(data, sex_label) {
       linewidth = 0.3
     ) +
     
-    # Add text (inside for most, outside for those with arrows)
-    geom_text(
+    # Add white label background
+    geom_label(
       data = centroids,
       aes(x = label_x, y = label_y, label = paste0(round(Chronic_Pct, 1), "%")),
       color = "black",
+      fill = "white",
       size = 2.3,
-      fontface = "bold"
+      fontface = "bold",
+      label.padding = unit(0.15, "lines"),
+      label.size = 0
     ) +
     
     scale_fill_gradient(
@@ -195,7 +176,7 @@ plot_hcc_final <- function(data, sex_label) {
     labs(
       title = paste("Chronic BZRA Use by Health Council (HCC) –", sex_label),
       subtitle = "Darker = Higher % Chronic Use",
-      caption = "Data source: SIMOA + NBHC Health Councils"
+      caption = "Data source: NBHC Health Councils"
     ) +
     
     theme_void(base_size = 14) +
