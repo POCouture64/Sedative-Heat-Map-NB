@@ -88,7 +88,7 @@ hcc_map <- hcc %>%
 zones_union <- st_union(st_make_valid(zones))
 
 # ----------------------------------------------------------
-# PLOT FUNCTION (Final Version)
+# PLOT FUNCTION (HCC 14.1 moved lower)
 # ----------------------------------------------------------
 plot_hcc_final <- function(data, sex_label) {
   dat_sex <- subset(data, Sex == sex_label)
@@ -130,7 +130,7 @@ plot_hcc_final <- function(data, sex_label) {
         com == 8 ~ X + 0.92,
         com == 14.3 ~ X + 0.42,
         com == 22.1 ~ X + 2.3,
-        com == 11 ~ X - 0.05,    # slight right shift
+        com == 11 ~ X - 0.05,    # slight right
         com == 14.1 ~ X + 0.05,  # slightly right
         TRUE ~ X
       ),
@@ -140,7 +140,7 @@ plot_hcc_final <- function(data, sex_label) {
         com == 14.3 ~ Y - 0.42,
         com == 22.1 ~ Y - 0.77,
         com == 11 ~ Y + 0.10,
-        com == 14.1 ~ Y + 0.08,  # raised higher
+        com == 14.1 ~ Y - 0.05,  # LOWER than before
         TRUE ~ Y
       )
     )
@@ -149,12 +149,9 @@ plot_hcc_final <- function(data, sex_label) {
   # PLOT
   # ----------------------------------------------------------
   ggplot() +
-    # Keep the health zone outlines
     geom_sf(data = zones_union, fill = NA, color = "grey40", linewidth = 0.8) +
-    # Health council polygons
     geom_sf(data = dat_sex, aes(fill = Chronic_Pct), color = "white", linewidth = 0.4) +
     
-    # Arrows for selected HCCs only
     geom_segment(
       data = subset(centroids, com %in% arrow_hccs),
       aes(x = X, y = Y, xend = xend, yend = yend),
@@ -163,7 +160,6 @@ plot_hcc_final <- function(data, sex_label) {
       linewidth = 0.3
     ) +
     
-    # Labels (slightly transparent white background)
     geom_label(
       data = centroids,
       aes(x = label_x, y = label_y, label = paste0(round(Chronic_Pct, 1), "%")),
