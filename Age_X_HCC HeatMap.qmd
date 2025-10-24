@@ -98,10 +98,10 @@ plot_hcc_final <- function(data, sex_label) {
   coords <- as.data.frame(st_coordinates(centroids))
   centroids <- cbind(dat_sex, coords)
   
-  # HCCs that use arrows
+  # HCCs with arrows
   arrow_hccs <- c(6, 8, 14.3, 22.1)
   
-  # Adjust positions and label locations
+  # Adjust label and arrow positions
   centroids <- centroids %>%
     mutate(
       xend = X,
@@ -140,7 +140,7 @@ plot_hcc_final <- function(data, sex_label) {
         com == 14.3 ~ Y - 0.42,
         com == 22.1 ~ Y - 0.77,
         com == 11 ~ Y + 0.10,
-        com == 14.1 ~ Y - 0.25, # significantly lower
+        com == 14.1 ~ Y - 0.125, # half the previous downward shift
         TRUE ~ Y
       )
     )
@@ -152,16 +152,11 @@ plot_hcc_final <- function(data, sex_label) {
   # PLOT
   # ----------------------------------------------------------
   ggplot() +
-    # Outer border (converted properly from bbox)
     geom_sf(data = bbox_poly, fill = NA, color = "grey50", linewidth = 1) +
-    
-    # Zone outlines
     geom_sf(data = zones_union, fill = NA, color = "grey40", linewidth = 0.8) +
-    
-    # HCC regions
     geom_sf(data = dat_sex, aes(fill = Chronic_Pct), color = "white", linewidth = 0.4) +
     
-    # Arrows for select HCCs
+    # Arrows for selected HCCs only
     geom_segment(
       data = subset(centroids, com %in% arrow_hccs),
       aes(x = X, y = Y, xend = xend, yend = yend),
@@ -170,7 +165,7 @@ plot_hcc_final <- function(data, sex_label) {
       linewidth = 0.3
     ) +
     
-    # Labels (percentages)
+    # Labels
     geom_label(
       data = centroids,
       aes(x = label_x, y = label_y, label = paste0(round(Chronic_Pct, 1), "%")),
