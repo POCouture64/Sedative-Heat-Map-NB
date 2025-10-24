@@ -88,7 +88,7 @@ hcc_map <- hcc %>%
 zones_union <- st_union(st_make_valid(zones))
 
 # ----------------------------------------------------------
-# PLOT FUNCTION (HCC 14.1 moved further down by 0.45)
+# PLOT FUNCTION (HCC 14.1 moved down by 0.35)
 # ----------------------------------------------------------
 plot_hcc_final <- function(data, sex_label) {
   dat_sex <- subset(data, Sex == sex_label)
@@ -140,7 +140,7 @@ plot_hcc_final <- function(data, sex_label) {
         com == 14.3 ~ Y - 0.42,
         com == 22.1 ~ Y - 0.77,
         com == 11 ~ Y + 0.10,
-        com == 14.1 ~ Y - 0.45,  # ⬇️ moved further down
+        com == 14.1 ~ Y - 0.35,  # ⬇️ lowered moderately
         TRUE ~ Y
       )
     )
