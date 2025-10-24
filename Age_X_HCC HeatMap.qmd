@@ -73,7 +73,9 @@ total_summary <- df_combined %>%
 df_hcc_final <- bind_rows(df_combined, total_summary) %>%
   mutate(HCC = as.numeric(as.character(HCC)))
 
-# --- Load shapefiles ---
+# ----------------------------------------------------------
+# LOAD MAPS
+# ----------------------------------------------------------
 hcc <- st_read("https://gnb.socrata.com/api/geospatial/sdyn-7de6?method=export&format=GeoJSON", quiet = TRUE) %>%
   st_make_valid() %>%
   mutate(com = as.numeric(com))
@@ -86,37 +88,34 @@ hcc_map <- hcc %>%
 
 zones_union <- st_union(st_make_valid(zones))
 
-# --- Plot function ---
+# ----------------------------------------------------------
+# PLOT FUNCTION
+# ----------------------------------------------------------
 plot_hcc_final <- function(data, sex_label) {
   dat_sex <- subset(data, Sex == sex_label)
   
-  # Get label positions - use st_point_on_surface to ensure points are inside polygons
+  # Get label positions inside polygons
   centroids <- st_point_on_surface(dat_sex)
   coords <- as.data.frame(st_coordinates(centroids))
   centroids <- cbind(dat_sex, coords)
   
-  # Define which HCCs get arrows pointing outside (removed 5, 7, 11, 14.1, 14.2)
+  # HCCs with arrows
   arrow_hccs <- c(6, 8, 14.3, 22.1)
   
-  # Base label positions
+  # Adjust positions
   centroids <- centroids %>%
     mutate(
       xend = X,
       yend = Y,
       label_x = X,
       label_y = Y
-    )
-  
-  # Custom arrow directions and distances for each HCC with arrows
-  centroids <- centroids %>%
+    ) %>%
     mutate(
-      # Northeast cluster - only 6 and 8 get arrows
+      # Arrows (only for selected HCCs)
       xend = case_when(
         com == 6 ~ X + 0.75,
         com == 8 ~ X + 0.85,
-        # East coast - only 14.3 gets arrow
         com == 14.3 ~ X + 0.35,
-        # Southeast
         com == 22.1 ~ X + 2.2,
         TRUE ~ X
       ),
@@ -132,6 +131,8 @@ plot_hcc_final <- function(data, sex_label) {
         com == 8 ~ X + 0.92,
         com == 14.3 ~ X + 0.42,
         com == 22.1 ~ X + 2.3,
+        com == 11 ~ X - 0.15,    # nudge left
+        com == 14.1 ~ X - 0.10,  # nudge left
         TRUE ~ X
       ),
       label_y = case_when(
@@ -139,15 +140,20 @@ plot_hcc_final <- function(data, sex_label) {
         com == 8 ~ Y + 0.27,
         com == 14.3 ~ Y - 0.42,
         com == 22.1 ~ Y - 0.77,
+        com == 11 ~ Y + 0.10,    # nudge up
+        com == 14.1 ~ Y + 0.12,  # nudge up
         TRUE ~ Y
       )
     )
   
+  # ----------------------------------------------------------
+  # PLOT
+  # ----------------------------------------------------------
   ggplot() +
     geom_sf(data = zones_union, fill = NA, color = "grey40", linewidth = 0.8) +
     geom_sf(data = dat_sex, aes(fill = Chronic_Pct), color = "white", linewidth = 0.4) +
     
-    # Add arrows for selected HCCs only
+    # Arrows for selected HCCs only
     geom_segment(
       data = subset(centroids, com %in% arrow_hccs),
       aes(x = X, y = Y, xend = xend, yend = yend),
@@ -156,13 +162,13 @@ plot_hcc_final <- function(data, sex_label) {
       linewidth = 0.3
     ) +
     
-    # Add white label background
+    # Labels (percentages)
     geom_label(
       data = centroids,
       aes(x = label_x, y = label_y, label = paste0(round(Chronic_Pct, 1), "%")),
       color = "black",
       fill = "white",
-      size = 1,
+      size = 1.8,
       fontface = "plain",
       label.padding = unit(0.08, "lines"),
       label.size = 0
@@ -188,7 +194,9 @@ plot_hcc_final <- function(data, sex_label) {
     )
 }
 
-# --- Export ---
+# ----------------------------------------------------------
+# EXPORT MAPS
+# ----------------------------------------------------------
 map_men   <- plot_hcc_final(hcc_map, "Men")
 map_women <- plot_hcc_final(hcc_map, "Women")
 map_total <- plot_hcc_final(hcc_map, "Total")
