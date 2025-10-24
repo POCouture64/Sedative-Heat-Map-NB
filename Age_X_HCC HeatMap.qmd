@@ -28,148 +28,97 @@ Age_x_HCC_Sheet <- Age_x_HCC_Sheet[, !names(Age_x_HCC_Sheet) %in% c("...8", "...
 library(dplyr)
 library(sf)
 library(ggplot2)
-library(ggrepel)
 library(ragg)
-library(lwgeom)  
+library(lwgeom)
 
 # ----------------------------------------------------------
-# SUMMARIZE DATA
-# ----------------------------------------------------------
-# --- Summaries ---
-men_summary <- Age_x_HCC_Sheet %>%
-  group_by(M_HCC) %>%
-  summarise(
-    Sex = "Men",
-    Chronic_Use = sum(`M_Chronic_Use(total)`, na.rm = TRUE),
-    Population = sum(M_Estimated_Total_Population, na.rm = TRUE),
-    Chronic_Pct = 100 * Chronic_Use / Population,
-    .groups = "drop"
-  ) %>%
-  rename(HCC = M_HCC)
-
-women_summary <- Age_x_HCC_Sheet %>%
-  group_by(W_HCC) %>%
-  summarise(
-    Sex = "Women",
-    Chronic_Use = sum(`W_Chronic_Use(total)`, na.rm = TRUE),
-    Population = sum(W_Estimated_Total_Population, na.rm = TRUE),
-    Chronic_Pct = 100 * Chronic_Use / Population,
-    .groups = "drop"
-  ) %>%
-  rename(HCC = W_HCC)
-
-df_combined <- bind_rows(men_summary, women_summary)
-
-total_summary <- df_combined %>%
-  group_by(HCC) %>%
-  summarise(
-    Sex = "Total",
-    Chronic_Use = sum(Chronic_Use, na.rm = TRUE),
-    Population = sum(Population, na.rm = TRUE),
-    Chronic_Pct = 100 * Chronic_Use / Population,
-    .groups = "drop"
-  )
-
-df_hcc_final <- bind_rows(df_combined, total_summary) %>%
-  mutate(HCC = as.numeric(as.character(HCC)))
-
-# ----------------------------------------------------------
-# LOAD MAPS
-# ----------------------------------------------------------
-hcc <- st_read("https://gnb.socrata.com/api/geospatial/sdyn-7de6?method=export&format=GeoJSON", quiet = TRUE) %>%
-  st_make_valid() %>%
-  mutate(com = as.numeric(com))
-
-zones <- st_read("https://gnb.socrata.com/api/geospatial/x8mg-22ju?method=export&format=GeoJSON", quiet = TRUE) %>%
-  st_make_valid()
-
-hcc_map <- hcc %>%
-  left_join(df_hcc_final, by = c("com" = "HCC"))
-
-zones_union <- st_union(st_make_valid(zones))
-
-# ----------------------------------------------------------
-# PLOT FUNCTION
+# UPDATED PLOT FUNCTION: keep HCC 11 original placement,
+# move HCC 14.1 down & right relative to its centroid.
+# Only arrows for: 6, 8, 14.3, 22.1
 # ----------------------------------------------------------
 plot_hcc_final <- function(data, sex_label) {
   dat_sex <- subset(data, Sex == sex_label)
   
-  # Get label positions inside polygons
+  # Get "inside polygon" points
   centroids <- st_point_on_surface(dat_sex)
   coords <- as.data.frame(st_coordinates(centroids))
   centroids <- cbind(dat_sex, coords)
   
-  # HCCs with arrows
+  # HCCs that should have arrows
   arrow_hccs <- c(6, 8, 14.3, 22.1)
   
-  # Adjust positions
+  # Base: no movement
   centroids <- centroids %>%
     mutate(
       xend = X,
       yend = Y,
       label_x = X,
       label_y = Y
-    ) %>%
+    )
+  
+  # Apply adjustments:
+  centroids <- centroids %>%
     mutate(
-      # Arrows (only for selected HCCs)
+      # arrow end positions only for selected HCCs
       xend = case_when(
-        com == 6 ~ X + 0.75,
-        com == 8 ~ X + 0.85,
-        com == 14.3 ~ X + 0.35,
-        com == 22.1 ~ X + 2.2,
-        TRUE ~ X
+        com == 6   ~ X + 0.75,
+        com == 8   ~ X + 0.85,
+        com == 14.3~ X + 0.35,
+        com == 22.1~ X + 2.2,
+        TRUE       ~ X
       ),
       yend = case_when(
-        com == 6 ~ Y + 0.6,
-        com == 8 ~ Y + 0.2,
+        com == 6    ~ Y + 0.6,
+        com == 8    ~ Y + 0.2,
         com == 14.3 ~ Y - 0.35,
         com == 22.1 ~ Y - 0.7,
-        TRUE ~ Y
+        TRUE        ~ Y
       ),
+      # label positions:
+      # - KEEP HCC 11 at original centroid (no change)
+      # - MOVE HCC 14.1 down & right from original: +0.15 x, -0.15 y
       label_x = case_when(
-        com == 6 ~ X + 0.82,
-        com == 8 ~ X + 0.92,
+        com == 6    ~ X + 0.82,
+        com == 8    ~ X + 0.92,
         com == 14.3 ~ X + 0.42,
         com == 22.1 ~ X + 2.3,
-        com == 11 ~ X - 0.15,    # nudge left
-        com == 14.1 ~ X - 0.10,  # nudge left
-        TRUE ~ X
+        com == 14.1 ~ X + 0.15,   # moved right
+        TRUE        ~ X           # includes com == 11 (keeps original)
       ),
       label_y = case_when(
-        com == 6 ~ Y + 0.67,
-        com == 8 ~ Y + 0.27,
+        com == 6    ~ Y + 0.67,
+        com == 8    ~ Y + 0.27,
         com == 14.3 ~ Y - 0.42,
         com == 22.1 ~ Y - 0.77,
-        com == 11 ~ Y + 0.10,    # nudge up
-        com == 14.1 ~ Y + 0.12,  # nudge up
-        TRUE ~ Y
+        com == 14.1 ~ Y - 0.15,   # moved down
+        TRUE        ~ Y
       )
     )
   
-  # ----------------------------------------------------------
-  # PLOT
-  # ----------------------------------------------------------
+  # Build plot
   ggplot() +
+    # zone outlines
     geom_sf(data = zones_union, fill = NA, color = "grey40", linewidth = 0.8) +
+    # HCC fill
     geom_sf(data = dat_sex, aes(fill = Chronic_Pct), color = "white", linewidth = 0.4) +
     
-    # Arrows for selected HCCs only
+    # arrows only for specified HCCs
     geom_segment(
       data = subset(centroids, com %in% arrow_hccs),
       aes(x = X, y = Y, xend = xend, yend = yend),
-      arrow = arrow(length = unit(0.15, "inches")),
+      arrow = arrow(length = unit(0.15, "inches")), # small arrowhead; change to NULL for plain line
       color = "black",
       linewidth = 0.3
     ) +
     
-    # Labels (percentages)
+    # labels: white background for readability
     geom_label(
       data = centroids,
       aes(x = label_x, y = label_y, label = paste0(round(Chronic_Pct, 1), "%")),
       color = "black",
       fill = "white",
       size = 1.8,
-      fontface = "plain",
+      fontface = "bold",
       label.padding = unit(0.08, "lines"),
       label.size = 0
     ) +
@@ -195,7 +144,7 @@ plot_hcc_final <- function(data, sex_label) {
 }
 
 # ----------------------------------------------------------
-# EXPORT MAPS
+# CREATE & EXPORT (men/women/total)
 # ----------------------------------------------------------
 map_men   <- plot_hcc_final(hcc_map, "Men")
 map_women <- plot_hcc_final(hcc_map, "Women")
