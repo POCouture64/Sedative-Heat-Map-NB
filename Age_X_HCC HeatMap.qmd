@@ -35,7 +35,6 @@ library(lwgeom)
 # ----------------------------------------------------------
 # SUMMARIZE DATA
 # ----------------------------------------------------------
-# --- Summaries ---
 men_summary <- Age_x_HCC_Sheet %>%
   group_by(M_HCC) %>%
   summarise(
@@ -94,7 +93,7 @@ zones_union <- st_union(st_make_valid(zones))
 plot_hcc_final <- function(data, sex_label) {
   dat_sex <- subset(data, Sex == sex_label)
   
-  # Get label positions inside polygons
+  # Label coordinates
   centroids <- st_point_on_surface(dat_sex)
   coords <- as.data.frame(st_coordinates(centroids))
   centroids <- cbind(dat_sex, coords)
@@ -131,8 +130,8 @@ plot_hcc_final <- function(data, sex_label) {
         com == 8 ~ X + 0.92,
         com == 14.3 ~ X + 0.42,
         com == 22.1 ~ X + 2.3,
-        com == 11 ~ X - 0.15,    # nudge left
-        com == 14.1 ~ X - 0.10,  # nudge left
+        com == 11 ~ X - 0.15,
+        com == 14.1 ~ X - 0.10,
         TRUE ~ X
       ),
       label_y = case_when(
@@ -140,20 +139,19 @@ plot_hcc_final <- function(data, sex_label) {
         com == 8 ~ Y + 0.27,
         com == 14.3 ~ Y - 0.42,
         com == 22.1 ~ Y - 0.77,
-        com == 11 ~ Y + 0.10,    # nudge up
-        com == 14.1 ~ Y + 0.12,  # nudge up
+        com == 11 ~ Y + 0.10,
+        com == 14.1 ~ Y + 0.12,
         TRUE ~ Y
       )
     )
   
   # ----------------------------------------------------------
-  # PLOT
+  # PLOT (uniform formatting across all three maps)
   # ----------------------------------------------------------
   ggplot() +
     geom_sf(data = zones_union, fill = NA, color = "grey40", linewidth = 0.8) +
     geom_sf(data = dat_sex, aes(fill = Chronic_Pct), color = "white", linewidth = 0.4) +
     
-    # Arrows for selected HCCs only
     geom_segment(
       data = subset(centroids, com %in% arrow_hccs),
       aes(x = X, y = Y, xend = xend, yend = yend),
@@ -162,13 +160,12 @@ plot_hcc_final <- function(data, sex_label) {
       linewidth = 0.3
     ) +
     
-    # Labels (percentages)
     geom_label(
       data = centroids,
       aes(x = label_x, y = label_y, label = paste0(round(Chronic_Pct, 1), "%")),
       color = "black",
       fill = "white",
-      size = 1.8,
+      size = 2.2,
       fontface = "plain",
       label.padding = unit(0.08, "lines"),
       label.size = 0
