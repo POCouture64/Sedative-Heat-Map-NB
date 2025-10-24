@@ -131,7 +131,7 @@ plot_hcc_final <- function(data, sex_label) {
         com == 14.3 ~ X + 0.42,
         com == 22.1 ~ X + 2.3,
         com == 11 ~ X - 0.05,   # slightly more right (was -0.15)
-        com == 14.1 ~ X - 0.10, # same horizontal offset
+        com == 14.1 ~ X - 0.05, # same horizontal offset
         TRUE ~ X
       ),
       label_y = case_when(
@@ -140,7 +140,7 @@ plot_hcc_final <- function(data, sex_label) {
         com == 14.3 ~ Y - 0.42,
         com == 22.1 ~ Y - 0.77,
         com == 11 ~ Y + 0.10,   # keep same vertical
-        com == 14.1 ~ Y - 0.05, # moved lower (was +0.12)
+        com == 14.1 ~ Y - 0.00001, # moved lower (was +0.12)
         TRUE ~ Y
       )
     )
