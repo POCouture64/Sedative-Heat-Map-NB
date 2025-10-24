@@ -88,7 +88,7 @@ hcc_map <- hcc %>%
 zones_union <- st_union(st_make_valid(zones))
 
 # ----------------------------------------------------------
-# PLOT FUNCTION (HCC 14.1 moved further down)
+# PLOT FUNCTION (HCC 14.1 moved further down by 0.25)
 # ----------------------------------------------------------
 plot_hcc_final <- function(data, sex_label) {
   dat_sex <- subset(data, Sex == sex_label)
@@ -130,8 +130,8 @@ plot_hcc_final <- function(data, sex_label) {
         com == 8 ~ X + 0.92,
         com == 14.3 ~ X + 0.42,
         com == 22.1 ~ X + 2.3,
-        com == 11 ~ X - 0.05,    # slightly right
-        com == 14.1 ~ X + 0.05,  # slightly right
+        com == 11 ~ X - 0.05,   # slightly more right
+        com == 14.1 ~ X + 0.05, # slight right shift
         TRUE ~ X
       ),
       label_y = case_when(
@@ -140,7 +140,7 @@ plot_hcc_final <- function(data, sex_label) {
         com == 14.3 ~ Y - 0.42,
         com == 22.1 ~ Y - 0.77,
         com == 11 ~ Y + 0.10,
-        com == 14.1 ~ Y - 0.10,  # lowered further
+        com == 14.1 ~ Y - 0.25,  # lowered significantly
         TRUE ~ Y
       )
     )
@@ -187,7 +187,8 @@ plot_hcc_final <- function(data, sex_label) {
       legend.position = "none",
       plot.title = element_text(size = 18, face = "bold", hjust = 0.5, color = "black"),
       plot.subtitle = element_text(size = 12, hjust = 0.5, color = "black"),
-      plot.caption = element_text(size = 10, hjust = 1, color = "black")
+      plot.caption = element_text(size = 10, hjust = 1, color = "black"),
+      panel.border = element_blank()
     )
 }
 
