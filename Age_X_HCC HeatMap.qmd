@@ -256,14 +256,12 @@ dev.off()
 
 ```{r}
 #| label: Map of Canada Use
-# Install and load required packages
-# install.packages(c("ggplot2", "dplyr", "sf"))
-
 library(ggplot2)
 library(dplyr)
 library(sf)
+library(here)
 
-# Data from the image
+# ---- Data ----
 province_data <- data.frame(
   province = c("BC", "AB", "SK", "MB", "ON", "NB", "PEI", "NS", "NL"),
   percentage = c(6.7, 9.9, 5.4, 10.7, 7.2, 22.6, 7.8, 14.1, 16.8),
@@ -273,7 +271,7 @@ province_data <- data.frame(
   stringsAsFactors = FALSE
 )
 
-# Define color categories based on your specifications
+# ---- Categorize percentages ----
 province_data <- province_data %>%
   mutate(
     category = case_when(
@@ -291,8 +289,7 @@ province_data <- province_data %>%
                                            "21-22.9"))
   )
 
-# Download Canada provinces shapefile from Statistics Canada
-# This is a direct download from a reliable government source
+# ---- Download Canada shapefile ----
 temp_zip <- tempfile(fileext = ".zip")
 temp_dir <- tempdir()
 
@@ -301,73 +298,70 @@ download.file(
   destfile = temp_zip,
   mode = "wb"
 )
-
 unzip(temp_zip, exdir = temp_dir)
 
-# Read the shapefile
 canada_sf <- st_read(file.path(temp_dir, "lpr_000b16a_e.shp"), quiet = TRUE)
 
-# Filter to only provinces (exclude territories for cleaner look if desired)
-# PRUID codes: 10=NL, 11=PE, 12=NS, 13=NB, 24=QC, 35=ON, 46=MB, 47=SK, 48=AB, 59=BC
+# ---- Keep only provinces (exclude territories) ----
 canada_provinces <- canada_sf %>%
   filter(PRUID %in% c("10", "11", "12", "13", "24", "35", "46", "47", "48", "59"))
 
-# Merge with our data
+# ---- Merge data (Quebec left without data) ----
 canada_map <- canada_provinces %>%
   left_join(province_data, by = "PRENAME")
 
-# Calculate centroids for labels
-centroids <- st_centroid(canada_map) %>%
-  st_coordinates() %>%
-  as.data.frame()
+# ---- Use st_point_on_surface() for reliable label positions ----
+points_inside <- st_point_on_surface(canada_map)
+coords_inside <- st_coordinates(points_inside) %>% as.data.frame()
+canada_map <- cbind(canada_map, coords_inside)
 
-canada_map <- cbind(canada_map, centroids)
-
-# Adjust label positions for Maritime provinces to avoid overlap
+# ---- Adjust labels for Maritimes ----
 canada_map <- canada_map %>%
   mutate(
     label_x = case_when(
-      province == "NB" ~ X + 1.5,  # Move NB label to the right
-      province == "NS" ~ X + 2.0,  # Move NS label further right
-      province == "PEI" ~ X - 0.5,  # Move PEI label slightly left
-      province == "NL" ~ X - 10.0,
+      province == "PEI" ~ X + 0.5,
+      province == "NS"  ~ X,
+      province == "NB"  ~ X + 0.5,
+      province == "NL"  ~ X - 4.5,
       TRUE ~ X
     ),
     label_y = case_when(
-      province == "NB" ~ Y + 0.5,  # Move NB label up
-      province == "NS" ~ Y - 10.0,  # Move NS label down
-      province == "PEI" ~ Y + 5.0,  # Move PEI label up
+      province == "PEI" ~ Y + 0.5,
+      province == "NS"  ~ Y - 1.5,
+      province == "NB"  ~ Y + 0.3,
+      province == "NL"  ~ Y - 5.0,
       TRUE ~ Y
-    )
-  )
-
-# Define colors based on your specifications
+    ),
+    # Only keep labels for provinces that have data
+canada_map <- canada_map %>%
+  mutate(
+    label_text = ifelse(province %in% province_data$province, 
+                        paste0(province, "\n", percentage, "%"), "")
+  ))
+# ---- Define color scale ----
 color_scale <- c(
-  "0-4.9" = "#00FF00",      # bright green
-  "5-6.9" = "#66CC66",      # semi-solid green
-  "7-8.9" = "#99DD99",      # semi-transparent green
-  "9-10.9" = "#D8BFD8",     # lavender purple (5-10%)
-  "13-14.9" = "#C8A8D8",    # lavender purple (10-15%)
-  "15-16.9" = "#B892C8",    # lavender purple (15-20%)
-  "21-22.9" = "#A87CB8"     # lavender purple (20-25%)
+  "0-4.9" = "#00FF00",
+  "5-6.9" = "#66CC66",
+  "7-8.9" = "#99DD99",
+  "9-10.9" = "#D8BFD8",
+  "13-14.9" = "#C8A8D8",
+  "15-16.9" = "#B892C8",
+  "21-22.9" = "#A87CB8"
 )
 
-# Create the map
-ggplot(data = canada_map) +
+# ---- Create the map ----
+canada_plot <- ggplot(canada_map) +
   geom_sf(aes(fill = category), color = "white", size = 0.5) +
   scale_fill_manual(
     values = color_scale,
-    na.value = "grey90",
+    na.value = "grey90",  # Quebec and missing provinces appear grey
     name = "Chronic Use (%)",
     labels = c("0-4.9", "5-6.9 (SK, BC)", "7-8.9 (ON, PEI)", 
                "9-10.9 (AB, MB)", "13-14.9 (NS)", "15-16.9 (NL)", 
                "21-22.9 (NB)"),
     drop = FALSE
   ) +
-  # Add province labels with percentages
-  geom_text(aes(x = label_x, y = label_y, label = ifelse(!is.na(percentage), 
-                                              paste0(province, "\n", percentage, "%"), 
-                                              "")),
+  geom_text(aes(x = label_x, y = label_y, label = label_text),
             size = 3.5, fontface = "bold", color = "black") +
   labs(
     title = "Chronic Use of 'Sleeping Pills' in Canada",
@@ -387,11 +381,324 @@ ggplot(data = canada_map) +
     axis.title = element_blank()
   )
 
-# Optional: Save the plot
-ggsave("canada_sleeping_pills_heatmap.png", width = 14, height = 10, dpi = 300)
+# ---- Save the map ----
+save_dir <- here::here("figures")
+if (!dir.exists(save_dir)) dir.create(save_dir)
 
-# Clean up temporary files
+ggsave(
+  filename = here::here("figures", "canada_sleeping_pills_heatmap_FINISH.png"),
+  plot = canada_plot,
+  width = 14,
+  height = 10,
+  dpi = 300
+)
+
+# ---- Clean up temporary files ----
 unlink(temp_zip)
 unlink(file.path(temp_dir, "lpr_000b16a_e.*"))
 ```
+
+
+## Health Region Data
+
+```{r}
+#| label: Health Region Maps - Any Use & Chronic Use
+
+library(sf)
+library(dplyr)
+library(ggplot2)
+library(ragg)
+
+# --- Compute centroids for labels ---
+hr_map_data <- hr_map_data %>%
+  st_transform(crs = 4326) %>%   # make sure projection is consistent
+  mutate(centroid = st_centroid(geometry)) %>%
+  cbind(st_coordinates(st_centroid(hr_map_data$geometry))) %>%
+  rename(X = X, Y = Y)
+
+# --- Plot function ---
+plot_hr_map <- function(data, fill_column, title_text, file_name) {
+  
+  gg <- ggplot(data) +
+    geom_sf(aes_string(fill = fill_column), color = "white", linewidth = 0.5) +
+    
+    # Add white background labels
+    geom_label(
+      aes(x = X, y = Y, label = paste0(round(.data[[fill_column]], 1), "%")),
+      color = "black",
+      fill = "white",
+      size = 4,
+      fontface = "bold",
+      label.padding = unit(0.15, "lines"),
+      label.size = 0
+    ) +
+    
+    scale_fill_gradient(low = "#e6d3fa", high = "#3f007d", na.value = "grey90") +
+    
+    labs(title = title_text) +
+    
+    theme_void() +             # remove axes and gridlines
+    coord_sf(datum = NA) +     # remove longitude/latitude lines
+    theme(
+      legend.position = "right",
+      plot.title = element_text(hjust = 0.5, face = "bold", size = 16)
+    )
+  
+  # Save as PNG
+  ragg::agg_png(file_name, width = 4000, height = 3200, res = 700)
+  print(gg)
+  dev.off()
+  
+  return(gg)
+}
+
+# --- Example usage ---
+map_any_use <- plot_hr_map(hr_map_data, "Any_Use_Perc", "Any BZRA Use by Health Region (%)", "HR_Map_Any_Use.png")
+map_chronic_use <- plot_hr_map(hr_map_data, "Chronic_Use_Perc", "Chronic BZRA Use by Health Region (%)", "HR_Map_Chronic_Use.png")
+```
+
+## HR x Sex
+
+```{r}
+#| label: Health Region Data by Sex
+
+# ----------------------------------------------------------
+# LOAD PACKAGES
+# ----------------------------------------------------------
+library(dplyr)
+library(sf)
+library(ggplot2)
+library(ragg)
+
+# ----------------------------------------------------------
+# Prepare Men and Women datasets (percentages already in 0–100 range)
+# ----------------------------------------------------------
+# Men summary by Health Region
+hr_men <- HR_Sex %>%
+  group_by(M_Health_Region) %>%
+  summarise(
+    Any_Use_Perc = mean(M_Any_Use_Perc, na.rm = TRUE),
+    Chronic_Use_Perc = mean(M_Chronic_Use_Perc, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  rename(region = M_Health_Region)
+
+# Women summary by Health Region
+hr_women <- HR_Sex %>%
+  group_by(W_Health_Region) %>%
+  summarise(
+    Any_Use_Perc = mean(W_Any_Use_Perc, na.rm = TRUE),
+    Chronic_Use_Perc = mean(W_Chronic_Use_Perc, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  rename(region = W_Health_Region)
+
+# ----------------------------------------------------------
+# Join to spatial data
+# ----------------------------------------------------------
+# Ensure region is numeric for join
+health_regions <- health_regions %>% mutate(region = as.numeric(region))
+
+# --- Men map ---
+hr_men_map <- health_regions %>%
+  left_join(hr_men, by = "region") %>%
+  st_as_sf() %>%
+  st_transform(crs = 4326)
+
+# Compute centroids for labels
+hr_men_centroids <- st_centroid(hr_men_map$geometry) %>% 
+  st_coordinates() %>% 
+  as.data.frame()
+hr_men_map <- cbind(hr_men_map, hr_men_centroids) %>% rename(X = X, Y = Y)
+
+# --- Women map ---
+hr_women_map <- health_regions %>%
+  left_join(hr_women, by = "region") %>%
+  st_as_sf() %>%
+  st_transform(crs = 4326)
+
+hr_women_centroids <- st_centroid(hr_women_map$geometry) %>% 
+  st_coordinates() %>% 
+  as.data.frame()
+hr_women_map <- cbind(hr_women_map, hr_women_centroids) %>% rename(X = X, Y = Y)
+
+# ----------------------------------------------------------
+# Plot function
+# ----------------------------------------------------------
+plot_hr_sex_map <- function(data, fill_column, title_text, file_name) {
+  
+  gg <- ggplot(data) +
+    geom_sf(aes_string(fill = fill_column), color = "white", linewidth = 0.5) +
+    
+    # Labels with white background and one decimal place
+    geom_label(
+      aes(x = X, y = Y, label = paste0(round(.data[[fill_column]], 1), "%")),
+      color = "black",
+      fill = "white",
+      size = 4,
+      fontface = "bold",
+      label.padding = unit(0.15, "lines"),
+      label.size = 0
+    ) +
+    
+    scale_fill_gradient(low = "#e6d3fa", high = "#3f007d", na.value = "grey90") +
+    
+    labs(title = title_text) +
+    
+    theme_void() +
+    coord_sf(datum = NA) +  # removes lat/long lines
+    theme(
+      legend.position = "right",
+      plot.title = element_text(hjust = 0.5, face = "bold", size = 16)
+    )
+  
+  # Export high-res PNG
+  ragg::agg_png(file_name, width = 4000, height = 3200, res = 700)
+  print(gg)
+  dev.off()
+  
+  return(gg)
+}
+
+# ----------------------------------------------------------
+# Generate maps
+# ----------------------------------------------------------
+map_men_any <- plot_hr_sex_map(
+  hr_men_map, 
+  "Any_Use_Perc", 
+  "Any BZRA Use by Health Region - Men (%)", 
+  "HR_Map_Men_Any_Use.png"
+)
+
+map_men_chronic <- plot_hr_sex_map(
+  hr_men_map, 
+  "Chronic_Use_Perc", 
+  "Chronic BZRA Use by Health Region - Men (%)", 
+  "HR_Map_Men_Chronic_Use.png"
+)
+
+map_women_any <- plot_hr_sex_map(
+  hr_women_map, 
+  "Any_Use_Perc", 
+  "Any BZRA Use by Health Region - Women (%)", 
+  "HR_Map_Women_Any_Use.png"
+)
+
+map_women_chronic <- plot_hr_sex_map(
+  hr_women_map, 
+  "Chronic_Use_Perc", 
+  "Chronic BZRA Use by Health Region - Women (%)", 
+  "HR_Map_Women_Chronic_Use.png"
+)
+```
+
+## HR x Age Group
+
+```{r}
+# ----------------------------------------------------------
+# LOAD PACKAGES
+# ----------------------------------------------------------
+library(dplyr)
+library(sf)
+library(ggplot2)
+library(ragg)
+library(tidyr)
+
+# ----------------------------------------------------------
+# LOAD SHAPEFILE - Health Regions (7 zones)
+# ----------------------------------------------------------
+health_regions <- st_read(
+  "https://gnb.socrata.com/api/geospatial/x8mg-22ju?method=export&format=GeoJSON",
+  quiet = TRUE
+) %>%
+  st_make_valid() %>%
+  st_transform(crs = 4326) %>%
+  mutate(region = as.numeric(region))  # numeric for join
+
+# ----------------------------------------------------------
+# PREPARE LONG DATA
+# ----------------------------------------------------------
+hr_long <- HR_AgeGroup %>%
+  select(M_HR, M_Age_Group, M_Chronic_Use_Perc,
+         W_HR, W_Age_Group, W_Chronic_Use_Perc) %>%
+  pivot_longer(
+    cols = everything(),
+    names_to = c("Sex", ".value"),
+    names_pattern = "(M|W)_(.*)"
+  ) %>%
+  rename(Health_Region = HR,
+         Age_Group = Age_Group,
+         Chronic_Use_Perc = Chronic_Use_Perc) %>%
+  mutate(Sex = ifelse(Sex == "M", "Men", "Women"))
+
+# ----------------------------------------------------------
+# JOIN DATA TO SHAPEFILE
+# ----------------------------------------------------------
+hr_long_sf <- hr_long %>%
+  left_join(health_regions, by = c("Health_Region" = "region")) %>%
+  st_as_sf() %>%
+  st_transform(crs = 4326)
+
+# Compute centroids for labels
+hr_long_sf <- hr_long_sf %>%
+  mutate(centroid = st_centroid(geometry)) %>%
+  cbind(st_coordinates(.$centroid)) %>%
+  rename(X = X, Y = Y)
+
+# ----------------------------------------------------------
+# PLOT FUNCTION
+# ----------------------------------------------------------
+plot_hr_map <- function(data, title_text, file_name) {
+  
+  gg <- ggplot(data) +
+    geom_sf(aes(fill = Chronic_Use_Perc), color = "white", linewidth = 0.5) +
+    
+    geom_label(
+      aes(x = X, y = Y, label = paste0(round(Chronic_Use_Perc, 1), "%")),
+      fill = "white",
+      color = "black",
+      fontface = "bold",
+      size = 4,
+      label.padding = unit(0.15, "lines"),
+      label.size = 0
+    ) +
+    
+    scale_fill_gradient(low = "#e6d3fa", high = "#3f007d", na.value = "grey90") +
+    
+    labs(title = title_text) +
+    
+    theme_void() +
+    coord_sf(datum = NA) +
+    theme(
+      legend.position = "right",
+      plot.title = element_text(hjust = 0.5, face = "bold", size = 16)
+    )
+  
+  ragg::agg_png(file_name, width = 4000, height = 3200, res = 700)
+  print(gg)
+  dev.off()
+  
+  return(gg)
+}
+
+# ----------------------------------------------------------
+# LOOP TO CREATE 10 MAPS
+# ----------------------------------------------------------
+age_groups <- c("65-69","70-74","75-79","80-84","85+")
+sexes <- c("Men","Women")
+
+for(s in sexes) {
+  for(a in age_groups) {
+    df_plot <- hr_long_sf %>% filter(Sex == s, Age_Group == a)
+    
+    map_title <- paste(s, a, "Chronic BZRA Use by Health Region (%)")
+    file_name <- paste0("HR_Map_", s, "_", gsub("-", "_", a), "_Chronic.png")
+    
+    plot_hr_map(df_plot, map_title, file_name)
+    message("✅ Saved: ", file_name)
+  }
+}
+```
+
+
 
