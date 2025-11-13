@@ -33,6 +33,24 @@ library(ragg)
 library(lwgeom)  
 
 # ----------------------------------------------------------
+# CREATE OUTPUT FOLDER
+# ----------------------------------------------------------
+output_dir <- "FINAL MAPS"
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir, recursive = TRUE)
+  message("✅ Created folder: ", output_dir)
+} else {
+  message("✅ Folder already exists: ", output_dir)
+}
+
+# ----------------------------------------------------------
+# CONSISTENT LEGEND LIMITS
+# ----------------------------------------------------------
+# Set the same scale for all HCC and Health Region maps
+SCALE_MIN <- 0
+SCALE_MAX <- 60
+
+# ----------------------------------------------------------
 # SUMMARIZE DATA
 # ----------------------------------------------------------
 # --- Summaries ---
@@ -166,13 +184,14 @@ plot_hcc_final <- function(data, sex_label) {
     
     scale_fill_gradient(
       low = "#e6d3fa", high = "#3f007d",
+      limits = c(SCALE_MIN, SCALE_MAX),
       name = "% Chronic Use", na.value = "grey90"
     ) +
     
     labs(
-      title = paste("Chronic BZRA Use by Health Council (HCC) –", sex_label),
+      title = paste("Chronic BSH Use by Health Council (HCC) –", sex_label),
       subtitle = "Darker = Higher % Chronic Use",
-      caption = "Data source: NBHC Health Councils"
+      caption = NULL
     ) +
     
     theme_void(base_size = 14) +
@@ -180,8 +199,13 @@ plot_hcc_final <- function(data, sex_label) {
       legend.position = "none",
       plot.title = element_text(size = 18, face = "bold", hjust = 0.5, color = "black"),
       plot.subtitle = element_text(size = 12, hjust = 0.5, color = "black"),
-      plot.caption = element_text(size = 10, hjust = 1, color = "black")
-    )
+      plot.margin = margin(5, 5, 30, 5)
+    ) +
+    
+    # Add caption as annotation to ensure it's centered and visible
+    annotate("text", x = Inf, y = -Inf, 
+             label = "BSHs include BZRAs (benzodiazepines and z-drugs), trazodone, and low-dose quetiapine",
+             hjust = 0.5, vjust = -0.5, size = 3, color = "black")
 }
 
 # --- Export ---
@@ -189,9 +213,20 @@ map_men   <- plot_hcc_final(hcc_map, "Men")
 map_women <- plot_hcc_final(hcc_map, "Women")
 map_total <- plot_hcc_final(hcc_map, "Total")
 
-agg_png("HCC_Map_Men.png", width = 4000, height = 3200, res = 600);   print(map_men);   dev.off()
-agg_png("HCC_Map_Women.png", width = 4000, height = 3200, res = 600); print(map_women); dev.off()
-agg_png("HCC_Map_Total.png", width = 4000, height = 3200, res = 600); print(map_total); dev.off()
+agg_png(file.path(output_dir, "HCC_Map_Men.png"), width = 4000, height = 3200, res = 600)
+print(map_men)
+dev.off()
+message("✅ Saved: HCC_Map_Men.png")
+
+agg_png(file.path(output_dir, "HCC_Map_Women.png"), width = 4000, height = 3200, res = 600)
+print(map_women)
+dev.off()
+message("✅ Saved: HCC_Map_Women.png")
+
+agg_png(file.path(output_dir, "HCC_Map_Total.png"), width = 4000, height = 3200, res = 600)
+print(map_total)
+dev.off()
+message("✅ Saved: HCC_Map_Total.png")
 ```
 
 ## Chronic Use % for males 65-69 and Females 85+
@@ -243,11 +278,11 @@ map_men_65_69 <- plot_hcc_final(hcc_map_men_65_69, "Men 65-69")
 map_women_85plus <- plot_hcc_final(hcc_map_women_85plus, "Women 85+")
 
 # --- Export ---
-agg_png("HCC_Map_Men_65_69.png", width = 4000, height = 3200, res = 600)
+agg_png(file.path(output_dir, "HCC_Map_Men_65_69.png"), width = 4000, height = 3200, res = 600)
 print(map_men_65_69)
 dev.off()
 
-agg_png("HCC_Map_Women_85plus.png", width = 4000, height = 3200, res = 600)
+agg_png(file.path(output_dir, "HCC_Map_Women_85plus.png"), width = 4000, height = 3200, res = 600)
 print(map_women_85plus)
 dev.off()
 
@@ -333,11 +368,10 @@ canada_map <- canada_map %>%
       TRUE ~ Y
     ),
     # Only keep labels for provinces that have data
-canada_map <- canada_map %>%
-  mutate(
     label_text = ifelse(province %in% province_data$province, 
                         paste0(province, "\n", percentage, "%"), "")
-  ))
+  )
+
 # ---- Define color scale ----
 color_scale <- c(
   "0-4.9" = "#00FF00",
@@ -382,11 +416,11 @@ canada_plot <- ggplot(canada_map) +
   )
 
 # ---- Save the map ----
-save_dir <- here::here("figures")
+save_dir <- file.path(output_dir)
 if (!dir.exists(save_dir)) dir.create(save_dir)
 
 ggsave(
-  filename = here::here("figures", "canada_sleeping_pills_heatmap_FINISH.png"),
+  filename = file.path(save_dir, "canada_sleeping_pills_heatmap_FINISH.png"),
   plot = canada_plot,
   width = 14,
   height = 10,
@@ -433,19 +467,27 @@ plot_hr_map <- function(data, fill_column, title_text, file_name) {
       label.size = 0
     ) +
     
-    scale_fill_gradient(low = "#e6d3fa", high = "#3f007d", na.value = "grey90") +
+    scale_fill_gradient(
+      low = "#e6d3fa", high = "#3f007d", 
+      limits = c(SCALE_MIN, SCALE_MAX),
+      na.value = "grey90"
+    ) +
     
-    labs(title = title_text) +
+    labs(
+      title = title_text,
+      caption = "Note: BSHs include BZRAs (benzodiazepines and z-drugs), trazodone, and low-dose quetiapine"
+    ) +
     
     theme_void() +             # remove axes and gridlines
     coord_sf(datum = NA) +     # remove longitude/latitude lines
     theme(
       legend.position = "right",
-      plot.title = element_text(hjust = 0.5, face = "bold", size = 16)
+      plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+      plot.caption = element_text(hjust = 0.5, size = 10, margin = margin(t = 10))
     )
   
   # Save as PNG
-  ragg::agg_png(file_name, width = 4000, height = 3200, res = 700)
+  ragg::agg_png(file.path(output_dir, file_name), width = 4000, height = 3200, res = 700)
   print(gg)
   dev.off()
   
@@ -453,8 +495,8 @@ plot_hr_map <- function(data, fill_column, title_text, file_name) {
 }
 
 # --- Example usage ---
-map_any_use <- plot_hr_map(hr_map_data, "Any_Use_Perc", "Any BZRA Use by Health Region (%)", "HR_Map_Any_Use.png")
-map_chronic_use <- plot_hr_map(hr_map_data, "Chronic_Use_Perc", "Chronic BZRA Use by Health Region (%)", "HR_Map_Chronic_Use.png")
+map_any_use <- plot_hr_map(hr_map_data, "Any_Use_Perc", "Any BSH Use by Health Region (%)", "HR_Map_Any_Use.png")
+map_chronic_use <- plot_hr_map(hr_map_data, "Chronic_Use_Perc", "Chronic BSH Use by Health Region (%)", "HR_Map_Chronic_Use.png")
 ```
 
 ## HR x Sex
@@ -541,19 +583,27 @@ plot_hr_sex_map <- function(data, fill_column, title_text, file_name) {
       label.size = 0
     ) +
     
-    scale_fill_gradient(low = "#e6d3fa", high = "#3f007d", na.value = "grey90") +
+    scale_fill_gradient(
+      low = "#e6d3fa", high = "#3f007d", 
+      limits = c(SCALE_MIN, SCALE_MAX),
+      na.value = "grey90"
+    ) +
     
-    labs(title = title_text) +
+    labs(
+      title = title_text,
+      caption = "Note: BSHs include BZRAs (benzodiazepines and z-drugs), trazodone, and low-dose quetiapine"
+    ) +
     
     theme_void() +
     coord_sf(datum = NA) +  # removes lat/long lines
     theme(
       legend.position = "right",
-      plot.title = element_text(hjust = 0.5, face = "bold", size = 16)
+      plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+      plot.caption = element_text(hjust = 0.5, size = 10, margin = margin(t = 10))
     )
   
   # Export high-res PNG
-  ragg::agg_png(file_name, width = 4000, height = 3200, res = 700)
+  ragg::agg_png(file.path(output_dir, file_name), width = 4000, height = 3200, res = 700)
   print(gg)
   dev.off()
   
@@ -566,28 +616,28 @@ plot_hr_sex_map <- function(data, fill_column, title_text, file_name) {
 map_men_any <- plot_hr_sex_map(
   hr_men_map, 
   "Any_Use_Perc", 
-  "Any BZRA Use by Health Region - Men (%)", 
+  "Any BSH Use by Health Region - Men (%)", 
   "HR_Map_Men_Any_Use.png"
 )
 
 map_men_chronic <- plot_hr_sex_map(
   hr_men_map, 
   "Chronic_Use_Perc", 
-  "Chronic BZRA Use by Health Region - Men (%)", 
+  "Chronic BSH Use by Health Region - Men (%)", 
   "HR_Map_Men_Chronic_Use.png"
 )
 
 map_women_any <- plot_hr_sex_map(
   hr_women_map, 
   "Any_Use_Perc", 
-  "Any BZRA Use by Health Region - Women (%)", 
+  "Any BSH Use by Health Region - Women (%)", 
   "HR_Map_Women_Any_Use.png"
 )
 
 map_women_chronic <- plot_hr_sex_map(
   hr_women_map, 
   "Chronic_Use_Perc", 
-  "Chronic BZRA Use by Health Region - Women (%)", 
+  "Chronic BSH Use by Health Region - Women (%)", 
   "HR_Map_Women_Chronic_Use.png"
 )
 ```
@@ -663,18 +713,26 @@ plot_hr_map <- function(data, title_text, file_name) {
       label.size = 0
     ) +
     
-    scale_fill_gradient(low = "#e6d3fa", high = "#3f007d", na.value = "grey90") +
+    scale_fill_gradient(
+      low = "#e6d3fa", high = "#3f007d", 
+      limits = c(SCALE_MIN, SCALE_MAX),
+      na.value = "grey90"
+    ) +
     
-    labs(title = title_text) +
+    labs(
+      title = title_text,
+      caption = "Note: BSHs include BZRAs (benzodiazepines and z-drugs), trazodone, and low-dose quetiapine"
+    ) +
     
     theme_void() +
     coord_sf(datum = NA) +
     theme(
       legend.position = "right",
-      plot.title = element_text(hjust = 0.5, face = "bold", size = 16)
+      plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+      plot.caption = element_text(hjust = 0.5, size = 10, margin = margin(t = 10))
     )
   
-  ragg::agg_png(file_name, width = 4000, height = 3200, res = 700)
+  ragg::agg_png(file.path(output_dir, file_name), width = 4000, height = 3200, res = 700)
   print(gg)
   dev.off()
   
@@ -691,7 +749,7 @@ for(s in sexes) {
   for(a in age_groups) {
     df_plot <- hr_long_sf %>% filter(Sex == s, Age_Group == a)
     
-    map_title <- paste(s, a, "Chronic BZRA Use by Health Region (%)")
+    map_title <- paste(s, a, "Chronic BSH Use by Health Region (%)")
     file_name <- paste0("HR_Map_", s, "_", gsub("-", "_", a), "_Chronic.png")
     
     plot_hr_map(df_plot, map_title, file_name)
@@ -699,6 +757,3 @@ for(s in sexes) {
   }
 }
 ```
-
-
-
