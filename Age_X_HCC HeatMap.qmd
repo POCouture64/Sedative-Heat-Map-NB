@@ -48,7 +48,7 @@ if (!dir.exists(output_dir)) {
 # ----------------------------------------------------------
 # Set the same scale for all HCC and Health Region maps
 SCALE_MIN <- 0
-SCALE_MAX <- 60
+SCALE_MAX <- 70
 
 # ----------------------------------------------------------
 # SUMMARIZE DATA
@@ -199,13 +199,8 @@ plot_hcc_final <- function(data, sex_label) {
       legend.position = "none",
       plot.title = element_text(size = 18, face = "bold", hjust = 0.5, color = "black"),
       plot.subtitle = element_text(size = 12, hjust = 0.5, color = "black"),
-      plot.margin = margin(5, 5, 30, 5)
-    ) +
-    
-    # Add caption as annotation to ensure it's centered and visible
-    annotate("text", x = Inf, y = -Inf, 
-             label = "BSHs include BZRAs (benzodiazepines and z-drugs), trazodone, and low-dose quetiapine",
-             hjust = 0.5, vjust = -0.5, size = 3, color = "black")
+      plot.margin = margin(5, 5, 5, 5)
+    )
 }
 
 # --- Export ---
@@ -281,11 +276,12 @@ map_women_85plus <- plot_hcc_final(hcc_map_women_85plus, "Women 85+")
 agg_png(file.path(output_dir, "HCC_Map_Men_65_69.png"), width = 4000, height = 3200, res = 600)
 print(map_men_65_69)
 dev.off()
+message("✅ Saved: HCC_Map_Men_65_69.png")
 
 agg_png(file.path(output_dir, "HCC_Map_Women_85plus.png"), width = 4000, height = 3200, res = 600)
 print(map_women_85plus)
 dev.off()
-
+message("✅ Saved: HCC_Map_Women_85plus.png")
 ```
 ## National Map
 
@@ -470,20 +466,18 @@ plot_hr_map <- function(data, fill_column, title_text, file_name) {
     scale_fill_gradient(
       low = "#e6d3fa", high = "#3f007d", 
       limits = c(SCALE_MIN, SCALE_MAX),
-      na.value = "grey90"
+      na.value = "grey90",
+      breaks = seq(0, 70, 10)
     ) +
     
-    labs(
-      title = title_text,
-      caption = "Note: BSHs include BZRAs (benzodiazepines and z-drugs), trazodone, and low-dose quetiapine"
-    ) +
+    labs(title = title_text) +
     
     theme_void() +             # remove axes and gridlines
     coord_sf(datum = NA) +     # remove longitude/latitude lines
     theme(
       legend.position = "right",
       plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
-      plot.caption = element_text(hjust = 0.5, size = 10, margin = margin(t = 10))
+      plot.margin = margin(10, 10, 10, 10)
     )
   
   # Save as PNG
